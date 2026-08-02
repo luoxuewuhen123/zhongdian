@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>滤油机在线监测</title>
+<script src="/static/echarts.min.js"></script>
+<style>
+:root{--bg:#1a1f2e;--p:#242b3d;--b:#334155;--t:#e2e8f0;--tb:#f8fafc;--pri:#60a5fa;--ok:#4ade80;--warn:#fbbf24;--dg:#f87171;--cy:#22d3ee;--vi:#a78bfa}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:14px/1.5 -apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:#e2e8f0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+a{color:var(--pri);text-decoration:none;cursor:pointer}
+input,select,button{font:inherit;outline:none}
+
+/* login */
+.login-overlay{position:fixed;inset:0;background:radial-gradient(ellipse at center,#2a3146,#1a1f2e);display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-box{background:var(--p);border:1px solid var(--b);border-radius:12px;padding:32px 28px;width:340px;max-width:92vw;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.login-box .icon{font-size:40px;margin-bottom:6px}
+.login-box h2{color:var(--tb);font-size:18px;margin-bottom:4px;font-weight:600}
+.login-box .sub{color:var(--t);font-size:11px;margin-bottom:20px}
+.login-box input{width:100%;padding:10px 12px;margin-bottom:10px;background:var(--bg);border:1px solid #334155;border-radius:6px;color:var(--tb);font-size:13px}
+.login-box input:focus{border-color:var(--pri)}
+.login-box button{width:100%;padding:10px;background:var(--pri);border:none;border-radius:6px;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.login-box button:active{opacity:.9}
+.login-box .err{color:var(--dg);font-size:11px;margin-top:6px;min-height:16px}
+
+/* header */
+#app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.header{height:42px;background:var(--p);border-bottom:1px solid var(--b);display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0}
+.header .brand{display:flex;align-items:center;gap:8px}
+.header .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.header .brand .dot.off{background:var(--warn)}
+.header h1{font-size:14px;color:var(--tb);font-weight:600}
+.header .rh{display:flex;align-items:center;gap:12px;font-size:11px}
+.header select{background:var(--bg);border:1px solid var(--b);color:var(--tb);padding:2px 6px;border-radius:4px;font-size:11px}
+.badge{background:var(--dg);color:#fff;padding:1px 8px;border-radius:10px;font-size:10px;display:none}
+@keyframes alarm-blink{0%,100%{background:var(--bg);color:var(--tb)}50%{background:rgba(239,68,68,.12);color:#f87171}}
+.nav-alarm-active{animation:alarm-blink 3s ease-in-out infinite}
+@keyframes ctrl-flash{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.05)}}
+.ctrl-pending .ctrl-st{animation:ctrl-flash .4s ease-in-out 5}
+
+/* nav */
+nav{height:36px;background:var(--p);border-bottom:1px solid var(--b);display:flex;flex-shrink:0}
+nav a{flex:1;display:flex;align-items:center;justify-content:center;color:var(--t);font-size:13px;border-bottom:2px solid transparent;cursor:pointer;transition:.15s;user-select:none}
+nav a:hover{color:var(--tb)}
+nav a.active{color:var(--pri);border-bottom-color:var(--pri);font-weight:600}
+
+/* main */
+main{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 14px}
+.page{display:none}.page.show{display:block}.page-flex.show{display:flex;flex-direction:column}
+
+/* cards */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.kpi{background:#111827;border:1px solid var(--b);border-radius:8px;padding:12px 14px}
+.kpi .kpi-lbl{font-size:11px;color:var(--t);margin-bottom:4px}
+.kpi .kpi-val{font-size:26px;font-weight:800;color:var(--tb)}
+.kpi .kpi-unit{margin-left:3px;font-size:12px;color:var(--t);font-weight:400}
+.kpi .kpi-sub{font-size:9px;color:var(--t);margin-top:2px}
+
+/* panels */
+.panel{background:var(--p);border:1px solid var(--b);border-radius:8px;overflow:hidden;margin-bottom:10px}
+.panel-h{padding:8px 12px;border-bottom:1px solid #334155;font-size:13px;font-weight:600;color:var(--tb);display:flex;justify-content:space-between;align-items:center}
+.panel-b{padding:10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#0f172a;padding:6px 10px;text-align:left;font-weight:600;color:var(--tb);border-bottom:2px solid var(--b);position:sticky;top:0;z-index:1;white-space:nowrap}
+td{padding:6px 10px;border-bottom:1px solid rgba(30,41,59,.5);color:var(--tb)}
+tr:hover td{background:rgba(96,165,250,.04)}
+
+/* tags */
+.tag{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;display:inline-block}
+.tag.ok{background:rgba(34,197,94,.12);color:var(--ok)}
+.tag.warn{background:rgba(245,158,11,.12);color:var(--warn)}
+.tag.danger{background:rgba(239,68,68,.12);color:var(--dg)}
+.tag.info{background:rgba(59,130,246,.12);color:var(--pri)}
+.tag.dim{background:rgba(100,116,139,.12);color:var(--t)}
+
+/* buttons */
+.btn{display:inline-block;padding:5px 12px;border-radius:5px;border:1px solid var(--b);background:var(--p);color:var(--tb);cursor:pointer;font-size:12px;transition:.15s;user-select:none}
+.btn:hover{background:var(--pri);color:#fff;border-color:var(--pri)}
+.btn.primary{background:var(--pri);color:#fff;border-color:var(--pri)}
+.btn.active{background:var(--pri);color:#fff;border-color:var(--pri)}
+.btn.sm{padding:3px 8px;font-size:10px}
+.btn.danger{background:var(--dg);color:#fff;border-color:var(--dg)}.btn.danger:hover{opacity:.85}
+
+/* gauge chart */
+.gauge-box{display:flex;align-items:center;justify-content:center;padding:10px;min-height:180px}
+
+/* settings tabs */
+.set-tabs{display:flex;gap:2px;margin-bottom:10px;flex-wrap:wrap}
+.set-tabs a{padding:6px 14px;font-size:11px;border-radius:4px 4px 0 0;border:1px solid transparent;border-bottom:none;color:var(--t);cursor:pointer}
+.set-tabs a:hover{color:var(--tb)}
+.set-tabs a.on{color:var(--pri);background:var(--p);border-color:var(--b);font-weight:600}
+.set-pane{display:none}.set-pane.on{display:block}
+
+/* params grid */
+.param-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.param-item{background:#0f172a;border:1px solid #1a2744;border-radius:6px;padding:8px 10px}
+.param-item .pn{font-size:10px;color:var(--t);font-weight:500}
+.param-item .pv{font-size:15px;font-weight:700;color:var(--tb)}
+.param-item .pu{margin-left:2px;font-size:10px;color:var(--t);font-weight:400}
+.cat-head{font-size:11px;font-weight:600;padding:6px 4px 2px;margin-top:2px;grid-column:1/-1}
+
+/* help */
+.help-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.help-card{background:var(--p);border:1px solid var(--b);border-radius:8px;padding:18px 20px}
+.help-card h4{color:var(--tb);font-size:15px;margin-bottom:10px}
+.help-card li{font-size:13px;color:var(--t);padding:3px 0;line-height:1.6;list-style:none}
+.help-card li::before{content:'•';color:var(--pri)}
+
+/* toast */
+.toast{position:fixed;top:10px;right:10px;padding:10px 18px;border-radius:6px;font-size:12px;color:#fff;z-index:9999;animation:slide .3s}
+.toast.ok{background:#16a34a}.toast.err{background:#dc2626}
+@keyframes slide{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* utils */
+.form-row{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.form-row input,.form-row select{flex:1;min-width:70px;padding:5px 8px;background:var(--bg);border:1px solid #334155;border-radius:5px;color:var(--tb);font-size:11px}
+.form-row input:focus{border-color:var(--pri)}
+
+/* responsive */
+@media(max-width:768px){
+  body{font-size:12px}
+  .header{height:38px;padding:0 10px}
+  .header h1{font-size:12px}
+  .header .rh{gap:6px;font-size:10px}
+  .header select{font-size:10px;max-width:80px}
+  nav{height:30px;overflow-x:auto}
+  nav a{font-size:10px;padding:0 6px;white-space:nowrap;flex:none;min-width:48px}
+  main{padding:8px 10px}
+  .kpi-row{grid-template-columns:repeat(3,1fr);gap:6px}
+  .kpi{padding:8px 10px}.kpi .kpi-val{font-size:20px}
+  .kpi .kpi-unit{font-size:10px}
+  .row2{grid-template-columns:1fr}
+  .help-grid{grid-template-columns:1fr;gap:8px}
+  .help-card{padding:14px 16px}
+  .help-card h4{font-size:14px}
+  .help-card li{font-size:12px}
+  .param-grid{grid-template-columns:repeat(2,1fr);gap:4px}
+  .param-item{padding:6px 8px}.param-item .pv{font-size:13px}
+  .panel-h{padding:6px 10px;font-size:11px}
+  .panel-b{padding:8px}
+  th,td{padding:4px 6px;font-size:10px}
+  .btn{padding:4px 10px;font-size:10px}
+  .btn.sm{padding:2px 6px;font-size:9px}
+  .set-tabs{gap:1px}
+  .set-tabs a{padding:5px 10px;font-size:10px}
+  .gauge-box{min-height:140px}
+  .login-box{width:300px;padding:24px 20px}
+  #mdStatus{font-size:11px}
+  .modal{width:95vw !important;max-width:420px}
+}
+@media(max-width:480px){
+  .header{height:36px;padding:0 8px}
+  .header h1{font-size:11px}
+  .header .rh{gap:4px}
+  .header .brand .dot{width:6px;height:6px}
+  nav{height:28px}
+  nav a{font-size:9px;padding:0 4px}
+  main{padding:6px 8px}
+  .kpi-row{grid-template-columns:repeat(2,1fr);gap:4px}
+  .kpi{padding:6px 8px}.kpi .kpi-val{font-size:17px}
+  .help-grid{grid-template-columns:1fr}
+  .param-grid{grid-template-columns:1fr 1fr;gap:3px}
+  .param-item{padding:5px 6px}.param-item .pv{font-size:12px}
+  table{font-size:10px}
+  .set-tabs{overflow-x:auto;flex-wrap:nowrap}
+  .set-tabs a{padding:4px 8px;font-size:10px;white-space:nowrap}
+  .login-box{width:92vw;padding:20px 16px}
+  .login-box h2{font-size:16px}
+  .login-box input,.login-box button{padding:8px;font-size:12px}
+  .form-row{flex-direction:column}
+  .form-row input,.form-row select{min-width:auto}
+  #histPager,#alarmPager{font-size:11px}
+  #histPager .btn,#alarmPager .btn{padding:3px 6px;font-size:9px}
+}
+@media(max-width:360px){
+  .kpi-row{grid-template-columns:1fr}.param-grid{grid-template-columns:1fr}
+  .header .rh{font-size:9px}
+}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="login">
+  <div class="login-box">
+    <div class="icon">🛢</div>
+    <h2>{{ device_name }}</h2>
+    <div class="sub">风电齿轮箱滤油机在线监测</div>
+    <input id="lu" placeholder="用户名" list="userList" autocomplete="off">
+    <datalist id="userList"></datalist>
+    <input id="lp" type="password" placeholder="密码" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">登 录</button>
+    <div class="err" id="le"></div>
+  </div>
+</div>
+
+<div id="app" style="display:none">
+  <div class="header">
+    <div class="brand"><span class="dot" id="hdot"></span><h1>{{ device_name }}</h1></div>
+    <div class="rh">
+      <select id="curDev" onchange="switchDevice()"></select>
+      <span class="badge" id="alarmBadge">⚠ 0</span>
+      <span style="color:var(--t)" id="hinfo"></span>
+      <span id="husr"></span>
+      <a onclick="logout()">退出</a>
+    </div>
+  </div>
+  <nav id="nav">
+    <a class="active" onclick="go('home')">📊 首页</a>
+    <a onclick="go('params')">⚡ 参数</a>
+    <a onclick="go('control')">🎮 控制</a>
+    <a onclick="go('history')">📋 历史</a>
+    <a onclick="go('alarm')" id="navAlarm">🔔 报警</a>
+    <a onclick="go('model')">🧠 模型</a>
+    <a onclick="go('reset')">🔄 换油重置</a>
+    <a onclick="go('settings')">⚙ 设置</a>
+    <a onclick="go('help')">💡 帮助</a>
+  </nav>
+  <main id="main">
+
+<!-- ================ 首页 ================ -->
+<div class="page show" id="p-home">
+  <div class="kpi-row" id="kpiRow"></div>
+  <!-- 油液健康（集成原油液页面） -->
+  <div class="row2" style="margin-bottom:8px">
+    <div class="panel">
+      <div class="panel-h">🧪 油液健康指数</div>
+      <div class="panel-b">
+        <div id="gaugeHome" style="height:175px"></div>
+        <div style="text-align:center;padding:2px 0 4px;font-size:11px;color:var(--t)">
+          剩余寿命约 <b style="color:var(--tb)" id="rulDays">--</b> 天
+          <span style="margin-left:8px">|</span>
+          退化率 <b style="color:var(--tb)" id="degRate">--</b>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">📊 指标评分</div>
+      <div class="panel-b">
+        <table><thead><tr><th>指标</th><th>实测值</th><th>得分</th><th>权重</th></tr></thead><tbody id="hiScores"></tbody></table>
+      </div>
+    </div>
+  </div>
+  <!-- 设备状态 -->
+  <div class="row2">
+    <div class="panel">
+      <div class="panel-h">🔌 传感器输入 (X)</div>
+      <div class="panel-b"><div class="param-grid" id="xGrid"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">🏭 执行器输出 (Y)</div>
+      <div class="panel-b"><div class="param-grid" id="yGrid"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================ 参数 ================ -->
+<div class="page" id="p-params">
+  <div class="panel">
+    <div class="panel-h">⚙ 系统参数 (D62-D82) <a class="btn sm" onclick="loadParams()" style="font-weight:400">🔄 刷新</a></div>
+    <div class="panel-b"><div class="param-grid" id="sysParams"></div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-h">🧪 油品品质 (D0-D60)</div>
+    <div class="panel-b"><div class="param-grid" id="oilParams"></div></div>
+  </div>
+</div>
+
+<!-- ================ 控制 ================ -->
+<div class="page" id="p-control">
+  <div id="ctrlOff" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--dg);display:none">⚠ PLC 未连接，无法远程控制（系统正在自动重连）</div>
+  <div class="param-grid" id="ctrlList" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))"></div>
+</div>
+
+<!-- ================ 历史 ================ -->
+<div class="page page-flex" id="p-history">
+  <div style="flex:none;display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--tb);font-weight:600">📋 历史数据</span>
+    <a class="btn sm hist-btn" data-h="1" onclick="loadHistoryHours(1)">1 小时</a>
+    <a class="btn sm hist-btn" data-h="6" onclick="loadHistoryHours(6)">6 小时</a>
+    <a class="btn sm active hist-btn" data-h="24" onclick="loadHistoryHours(24)">24 小时</a>
+    <a class="btn sm hist-btn" data-h="168" onclick="loadHistoryHours(168)">7 天</a>
+    <span style="color:#64748b;font-size:11px">或</span>
+    <input type="date" id="hs" onfocus="this.showPicker()" style="background:var(--bg);border:1px solid #334155;color:var(--tb);padding:4px 6px;border-radius:5px;font-size:11px;width:135px">
+    <input type="time" id="hst" value="00:00" onfocus="this.showPicker()" style="background:var(--bg);border:1px solid #334155;color:var(--tb);padding:4px 6px;border-radius:5px;font-size:11px;width:70px">
+    <span style="color:#64748b;font-size:11px">~</span>
+    <input type="date" id="he" onfocus="this.showPicker()" style="background:var(--bg);border:1px solid #334155;color:var(--tb);padding:4px 6px;border-radius:5px;font-size:11px;width:135px">
+    <input type="time" id="het" value="23:59" onfocus="this.showPicker()" style="background:var(--bg);border:1px solid #334155;color:var(--tb);padding:4px 6px;border-radius:5px;font-size:11px;width:70px">
+    <a class="btn sm" onclick="loadHistory()">🔍 查询</a>
+    <a class="btn sm" onclick="document.getElementById('hs').value='';document.getElementById('he').value='';hourRange=0;highlightHistBtn(0)">✕ 清除</a>
+    <a class="btn sm primary" onclick="exportCSV()" style="margin-left:auto">📥 导出</a>
+    <span style="font-size:11px;color:var(--t)">共 <span id="histCount">0</span> 条</span>
+  </div>
+  <div style="flex:1;overflow:auto;min-height:0">
+    <table id="histTable"><thead><tr><th>时间</th><th>精滤油温</th><th>极化油温</th><th>一级油压</th><th>二级油压</th><th>真空度</th><th>差压1</th><th>差压2</th><th>正极系数</th><th>负极系数</th></tr></thead><tbody><tr><td colspan="10" style="text-align:center;padding:20px;color:var(--t)">选择时间范围查看</td></tr></tbody></table>
+  </div>
+  <div style="flex:none;display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 0;font-size:12px" id="histPager"></div>
+</div>
+
+<!-- ================ 报警 ================ -->
+<div class="page" id="p-alarm">
+  <div class="panel">
+    <div class="panel-h">🔔 报警记录
+      <span style="font-size:11px;font-weight:400">
+        <a class="btn sm active alarm-filter" data-as="" onclick="loadAlarms('')">全部</a>
+        <a class="btn sm alarm-filter" data-as="active" onclick="loadAlarms('active')">激活</a>
+        <a class="btn sm alarm-filter" data-as="processing" onclick="loadAlarms('processing')">处理中</a>
+        <a class="btn sm alarm-filter" data-as="resolved" onclick="loadAlarms('resolved')">已解决</a>
+      </span>
+    </div>
+    <div class="panel-b">
+      <table><thead><tr><th>设备</th><th>时间</th><th>告警</th><th>等级</th><th>状态</th><th>操作</th></tr></thead><tbody id="alarmList"></tbody></table>
+      <div style="display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 0;font-size:12px" id="alarmPager"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================ 模型 ================ -->
+<div class="page" id="p-model">
+  <div class="panel" style="margin-bottom:10px"><div class="panel-h">🧠 当前模型</div>
+  <div class="panel-b" style="font-size:13px;line-height:2">
+    <div><b>算法：</b>5指标加权健康指数（HI） + 指数退化预测（RUL）</div>
+    <div><b>指标：</b>粘度(30%) 水分(25%) 污染度(20%) 介电常数(15%) 磨粒(10%)</div>
+    <div><b>校准状态：</b><span id="mdStatus" style="color:#f59e0b">加载中...</span></div>
+    <div style="font-size:12px;color:var(--t);margin-top:8px;padding:8px 10px;background:#0f172a;border-radius:6px;line-height:1.8">
+      <div style="color:var(--pri);font-weight:600;margin-bottom:4px">📋 校准说明</div>
+      <div><b style="color:#60a5fa">阶段一 · 基线校准：</b>注入新油后，在<span style="color:var(--tb)">换油重置页</span>清除旧数据 → 采集<span style="color:var(--tb)">≥3000条（约8.3小时）</span>后，手动点击下方「开始基线校准」。系统自动找到温度稳定段后学习新油基线。</div>
+      <div style="margin-top:4px"><b style="color:#a78bfa">阶段二 · 退化率：</b>系统<span style="color:var(--tb)">每7天</span>自动计算一次（无需人工操作）。取数据头尾各2万行的温度稳定段，计算各指标的实际退化速度。</div>
+    </div>
+  </div></div>
+  <div class="panel" style="margin-bottom:10px"><div class="panel-h" style="justify-content:flex-start;gap:12px">📏 新油基线（阶段一） <a id="btnCalibrate" class="btn primary sm" onclick="triggerBaselineCalibrate()">开始基线校准</a></div>
+  <div class="panel-b"><table><thead><tr><th>参数</th><th>基线值</th><th>来源</th></tr></thead><tbody id="mdBase"></tbody></table></div></div>
+  <div class="panel" style="margin-bottom:10px"><div class="panel-h">📈 退化率（阶段二）</div>
+  <div class="panel-b"><table><thead><tr><th>参数</th><th>周度退化率</th><th>趋势</th></tr></thead><tbody id="mdDrift"></tbody></table></div></div>
+</div>
+
+<!-- ================ 换油重置 ================ -->
+<div class="page" id="p-reset">
+  <div class="panel"><div class="panel-h">🔄 换油重置</div>
+  <div class="panel-b" style="font-size:14px;line-height:2;color:var(--t)">
+    <p>换油后，旧周期的油品数据不再反映当前油况。执行重置将：</p>
+    <ul style="margin:8px 0 8px 20px;color:#94a3b8">
+      <li>清除当前设备<span style="color:var(--dg)">所有历史采集数据</span></li>
+      <li>重置油液健康指数，重新建立新油基线</li>
+      <li>前往<span style="color:var(--pri)">模型页</span>手动触发阶段一基线校准</li>
+    </ul>
+    <p style="color:var(--warn);margin-bottom:12px">⚠ 建议先导出 CSV 备份旧数据</p>
+    <div style="display:flex;gap:10px">
+      <a class="btn" onclick="exportCSV()">📥 先导出 CSV</a>
+      <a class="btn danger" onclick="resetOilCycle()" id="btnOilReset">🗑 确认换油，清除旧数据</a>
+    </div>
+    <div id="resetMsg" style="margin-top:10px;font-size:13px"></div>
+  </div></div>
+  <div class="panel" style="margin-top:12px"><div class="panel-h">🗄 数据统计</div>
+  <div class="panel-b" style="font-size:14px;line-height:2;color:var(--t)">
+    <p>当前保留策略：<b>永久保留</b>，仅在「换油重置」时由管理员手动清除</p>
+    <p style="color:#94a3b8;margin:4px 0">累计采集：<span id="maintCnt">--</span> 条 · 数据库：<span id="maintSize">--</span></p>
+    <a class="btn" onclick="loadMaintainInfo()" style="margin-top:6px">🔄 刷新统计</a>
+  </div></div>
+</div>
+
+<!-- ================ 设置 ================ -->
+<div class="page" id="p-settings">
+  <div class="set-tabs" id="stabs">
+    <a class="on" onclick="stab('users')">👤 用户管理</a>
+    <a onclick="stab('devices')">📡 设备管理</a>
+    <a onclick="stab('info')">ℹ 系统信息</a>
+    <a onclick="stab('pwd')">🔑 修改密码</a>
+  </div>
+  <div class="set-pane on" id="sp-users">
+    <div class="panel" style="margin-bottom:10px"><div class="panel-h">➕ 添加用户</div>
+    <div class="panel-b"><div class="form-row"><input id="uname" placeholder="用户名"><input id="upass" type="password" placeholder="密码"><select id="urole"><option value="admin">管理员</option><option value="operator">运维员</option></select><a class="btn primary sm" onclick="addUser()">添加</a></div></div></div>
+    <div class="panel"><div class="panel-h">📋 用户列表</div>
+    <div class="panel-b"><table><thead><tr><th>用户名</th><th>角色</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="userList"></tbody></table></div></div>
+  </div>
+  <div class="set-pane" id="sp-devices">
+    <div class="panel" style="margin-bottom:10px"><div class="panel-h">➕ 添加设备</div>
+    <div class="panel-b"><div class="form-row"><input id="did" placeholder="编号(D002)"><input id="dname" placeholder="风机名称"><input id="dip" placeholder="PLC IP"><input id="dport" placeholder="端口" value="3000" type="number"><a class="btn primary sm" onclick="addDevice()">添加</a></div></div></div>
+    <div class="panel"><div class="panel-h">📋 设备列表</div>
+    <div class="panel-b"><table><thead><tr><th>编号</th><th>名称</th><th>IP:端口</th><th>操作</th></tr></thead><tbody id="devList"></tbody></table></div></div>
+  </div>
+  <div class="set-pane" id="sp-info">
+    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="kpi-lbl">🟢 PLC 连接</div><div class="kpi-val" style="font-size:18px" id="infoDev">--</div><div class="kpi-sub">当前设备</div></div>
+      <div class="kpi"><div class="kpi-lbl">📊 累计采集</div><div class="kpi-val" style="font-size:18px" id="setCnt">0</div></div>
+      <div class="kpi"><div class="kpi-lbl">🔌 连接状态</div><div class="kpi-val" style="font-size:16px" id="setSt">--</div></div>
+    </div>
+    <div class="panel" style="margin-top:10px"><div class="panel-h">⚙ 系统参数</div>
+    <div class="panel-b" style="font-size:12px;line-height:2.2;display:grid;grid-template-columns:1fr 1fr;gap:4px 20px">
+      <div>采集间隔：<b>10 秒</b></div><div>当前设备 PLC：<b id="infoPLC">--</b></div>
+      <div>数据库：<b>SQLite 本地</b></div><div>数据保留：<b>永久（手动清除）</b></div>
+      <div>告警规则：<b>PLC 内部报警位</b></div><div>通信协议：<b>Modbus TCP</b></div>
+    </div></div>
+  </div>
+  <div class="set-pane" id="sp-pwd">
+    <div class="panel" style="max-width:500px"><div class="panel-h">🔑 修改当前账户密码</div>
+    <div class="panel-b"><div class="form-row" style="flex-direction:column;gap:8px"><input id="oldPw" type="password" placeholder="原密码"><input id="newPw" type="password" placeholder="新密码（至少 8 位）"><a class="btn primary" onclick="changePwd()">确认修改</a></div></div></div>
+  </div>
+</div>
+
+<!-- ================ 帮助 ================ -->
+<div class="page" id="p-help">
+  <div class="help-grid">
+    <div class="help-card"><h4>📡 实时监测</h4><ul><li>采集温度、压力、油品品质等 <span style="color:var(--pri)">68个参数</span></li><li>数据 <span style="color:var(--pri)">每10秒</span> 自动刷新</li><li>所有数据<span style="color:var(--pri)">永久保留</span>，仅换油时手动清除</li><li>PLC 断连后自动重连，无需人工干预</li><li>支持多台设备切换监控，顶部下拉框选择</li></ul></div>
+    <div class="help-card"><h4>🧪 油液健康指数</h4><ul><li><span style="color:var(--pri)">5指标加权</span>：粘度(30%)、水分(25%)、污染度(20%)、介电常数(15%)、磨粒(10%)</li><li>阈值对齐 <span style="color:var(--pri)">NB/SH/T 0973</span> 风电齿轮箱换油国标</li><li>换油后手动校准新油基线（需≥3000条数据+油温稳定）</li><li>每7天自动更新退化率和自适应阈值</li><li>查看 <span style="color:var(--pri)">首页仪表盘</span> 了解剩余寿命</li><li><a href="/algorithm" target="_blank" style="color:var(--pri)">📖 查看完整算法说明</a></li></ul></div>
+    <div class="help-card"><h4>📥 数据导出</h4><ul><li>历史页支持 1h / 6h / 24h / 7天 快捷查询</li><li>可按日期范围精确筛选</li><li>点击 <span style="color:var(--pri)">📥 导出</span> 生成 CSV 文件，Excel 直接打开</li></ul></div>
+    <div class="help-card"><h4>🔔 告警说明</h4><ul><li>监测 PLC 内部报警位（极化油压高）</li><li>告警分 <span style="color:var(--pri)">激活/处理中/已解决</span> 三种状态</li><li>PLC 连接状态请查看首页或状态栏</li></ul></div>
+    <div class="help-card"><h4>🔄 换油操作</h4><ul><li>进入 <span style="color:var(--dg)">换油重置</span> 页，确认后清除旧数据</li><li>注入新油后前往<span style="color:var(--pri)">模型页</span>手动触发基线校准</li><li>重置前建议先 <span style="color:var(--pri)">导出 CSV 备份</span></li></ul></div>
+    <div class="help-card"><h4>👤 账号权限</h4><ul><li><span style="color:var(--pri)">管理员</span>：查看数据、远程控制、用户/设备管理</li><li><span style="color:var(--pri)">运维员</span>：查看数据、处理告警</li><li>密码采用 PBKDF2 加密存储</li></ul></div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ===== 全局状态 =====
+let P={},me={},curDev='D001',curPage='home',_csrf='',_cachedLatest=null,_cachedStatus=null;
+
+// ===== 工具函数 =====
+function toast(m,t='ok'){let d=document.createElement('div');d.className='toast '+t;d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),2500)}
+// HTML 转义，防止 XSS
+function esc(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// ETag 缓存：存储各接口最新 ETag
+let _etags={};
+async function api(m,u,b=null){
+  let headers={'Content-Type':'application/json'};
+  if(_csrf)headers['X-CSRF-Token']=_csrf;
+  // ETag 条件请求（仅 GET）
+  if(m==='GET'&&_etags[u])headers['If-None-Match']=_etags[u];
+  let o={method:m,headers};if(b)o.body=JSON.stringify(b);
+  let r=await fetch(u,o);
+  if(r.status===304)return {_unchanged:true};  // 数据未变
+  if(r.status===401){logout();return null}
+  if(r.status===403){
+    let d=await r.json();
+    if(d&&d.msg&&d.msg.includes('CSRF')){toast('安全验证过期，请刷新页面后重试','err');return null}
+    toast(d&&d.msg||'权限不足','err');return null
+  }
+  if(r.status===429){return null}  // 限流，静默跳过
+  let d=await r.json();
+  // 保存 ETag
+  let etag=r.headers.get('ETag');
+  if(etag)_etags[u]=etag;
+  if(d.code!==0&&d.msg)toast(d.msg,'err');return d
+}
+
+// ===== 登录 =====
+(function loadSavedUsers(){
+  let saved=localStorage.getItem('oil_users');
+  if(saved){
+    let list=document.getElementById('userList'),users=JSON.parse(saved);
+    list.innerHTML=users.map(u=>'<option value="'+u+'">').join('');
+    document.getElementById('lu').value=users[users.length-1]||''
+  }
+})();
+async function login(){
+  let d=await api('POST','/api/login',{username:document.getElementById('lu').value,password:document.getElementById('lp').value});
+  if(d&&d.code===0){
+    me=d.data;
+    if(me.csrf_token)_csrf=me.csrf_token;
+    document.getElementById('login').style.display='none';document.getElementById('app').style.display='flex';
+    document.getElementById('husr').textContent=me.username;
+    // 保存用户名（不存密码）
+    let u=me.username,saved=localStorage.getItem('oil_users'),users=saved?JSON.parse(saved):[];
+    if(!users.includes(u)){users.push(u);localStorage.setItem('oil_users',JSON.stringify(users))}
+    init();
+    if(me.must_change_password){
+      toast('检测到默认密码，请立即修改！','err');
+      setTimeout(()=>{go('settings');stab('pwd')},1500)
+    }
+  }else if(d)document.getElementById('le').textContent=d.msg
+}
+async function logout(){document.getElementById('login').style.display='flex';document.getElementById('app').style.display='none';await api('POST','/api/logout')}
+
+// ===== 页面切换 =====
+function go(n){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
+  document.getElementById('p-'+n).classList.add('show');
+  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
+  document.querySelector(`nav a[onclick*=\"go('${n}')\"]`).classList.add('active');
+  document.querySelector('main').style.overflowY=(n==='home'||n==='reset'||n==='help')?'hidden':'auto';
+  curPage=n;
+  // 切换页面前先清空内容区，避免闪现旧数据
+  if(n==='home'){document.getElementById('xGrid').innerHTML='';document.getElementById('yGrid').innerHTML=''}
+  if(n==='params'){document.getElementById('sysParams').innerHTML='';document.getElementById('oilParams').innerHTML=''}
+  if(n==='control')loadControl();
+  if(n==='home')loadHome();
+  if(n==='params')loadParams();
+  if(n==='history')loadHistoryHours(24);
+  if(n==='alarm')loadAlarms('');
+  if(n==='model')loadModel();
+  if(n==='reset'){loadMaintainInfo();document.getElementById('btnOilReset').style.display=me.role==='admin'?'':'none'}
+  if(n==='settings'){stab('users');loadSetting()}
+}
+
+// ===== 设置子页 =====
+function stab(t){
+  document.querySelectorAll('.set-pane').forEach(p=>p.classList.remove('on'));
+  document.getElementById('sp-'+t).classList.add('on');
+  document.querySelectorAll('#stabs a').forEach(a=>a.classList.remove('on'));
+  document.querySelector(`#stabs a[onclick*="'${t}'"]`).classList.add('on');
+  if(t==='users')loadUsers();
+  if(t==='devices')loadDevices();
+  if(t==='info')loadSetting();
+}
+
+// ===== 初始化 =====
+async function init(){
+  document.querySelector('main').style.overflowY='hidden';
+  try{P=(await(await fetch('/api/params')).json()).data}catch(e){P={system_params:[],oil_quality:[],x_inputs:[],y_outputs:[]}}
+  await loadDeviceList();
+  buildKpi();
+  refresh();setInterval(refresh,10000);
+  loadAlarmBadge();setInterval(loadAlarmBadge,10000);
+}
+
+function buildKpi(){
+  let cards=['精滤油温','极化油温','一级油压','差压1','真空度'];
+  let h='';for(let k of cards){let p=P.system_params.find(x=>x.key===k);h+=`<div class="kpi" title="${p?p.desc||'':''}"><div class="kpi-lbl">${k}</div><div style="font-size:26px;font-weight:800;color:var(--tb)" id="kv-${k}">--<span class="kpi-unit">${p?p.unit:''}</span></div></div>`}
+  document.getElementById('kpiRow').innerHTML=h;
+}
+
+async function refresh(){
+  let s=await api('GET','/api/status?device='+curDev);let st=s&&!s._unchanged?s.data:null;
+  if(!st){
+    // 状态数据未变化，仅更新 KPI（从缓存 latest 数据）
+    if(curPage==='home'&&_cachedLatest)loadHomeData(_cachedLatest,_cachedStatus||{connected:true});
+    return;
+  }
+  _cachedStatus=st;
+  document.getElementById('hdot').className='dot'+(st.connected?'':' off');
+  document.getElementById('hinfo').textContent=st.connected?'采集:'+(st.count||0)+'次':'● 正在重新连接...';
+  
+  // PLC离线时所有值显示--
+  if(!st.connected){
+    for(let k of['精滤油温','极化油温','一级油压','差压1','真空度']){
+      let el=document.getElementById('kv-'+k);if(el)el.innerHTML='--';
+    }
+    if(curPage==='home'){
+      document.getElementById('xGrid').innerHTML='';document.getElementById('yGrid').innerHTML='';
+      document.getElementById('gaugeHome').innerHTML='<div style="text-align:center;padding:60px;color:var(--t)">PLC 未连接<br><span style="font-size:12px;color:#64748b">系统正在自动重连，请稍候...</span></div>';
+      document.getElementById('hiScores').innerHTML='<tr><td colspan="4" style="text-align:center;padding:12px;color:var(--t)">--</td></tr>';
+      document.getElementById('rulDays').textContent='--';
+      document.getElementById('degRate').textContent='--';
+    }
+    if(curPage==='params'){document.getElementById('sysParams').innerHTML='';document.getElementById('oilParams').innerHTML='';}
+    return;
+  }
+
+  let d=await api('GET','/api/latest?device='+curDev);
+  if(!d||d._unchanged){
+    // 数据未变，使用缓存
+    if(curPage==='home'&&_cachedLatest)loadHomeData(_cachedLatest,st);
+    if(curPage==='params'&&_cachedLatest)loadParamsData(_cachedLatest);
+    if(curPage==='control'&&!ctrlPending)loadControlData(st);
+    return;
+  }
+  if(!d.data)return;
+  _cachedLatest=d.data;let v=d.data;
+  for(let k of['精滤油温','极化油温','一级油压','差压1','真空度']){
+    let val=v[k],ok=val!==undefined&&val!==null,el=document.getElementById('kv-'+k);
+    if(el){let p=P.system_params.find(x=>x.key===k),u=p?p.unit||'':'';el.innerHTML=ok?val.toFixed(u==='bar'||u==='Pa'?2:1):'--';el.innerHTML+='<span class=\"kpi-unit\">'+u+'</span>'}
+  }
+  if(curPage==='home')loadHomeData(v,st);
+  if(curPage==='params')loadParamsData(v);
+  if(curPage==='control'&&!ctrlPending)loadControlData(st);
+}
+
+async function loadAlarmBadge(){
+  let d=await api('GET','/api/alarms?status=active');if(!d)return;
+  let c=d.data.length,b=document.getElementById('alarmBadge'),n=document.getElementById('navAlarm');
+  b.style.display=c?'inline':'none';b.textContent='⚠ '+c;
+  if(c>0){n.textContent='🔔 报警('+c+')';n.classList.add('nav-alarm-active')}
+  else{n.textContent='🔔 报警';n.classList.remove('nav-alarm-active')}
+}
+
+async function loadDeviceList(){
+  let d=await api('GET','/api/devices');if(!d)return;let s=document.getElementById('curDev'),h='';
+  for(let r of d.data)h+=`<option value="${esc(r.id)}" ${r.id===curDev?'selected':''}>${esc(r.name||r.id)}</option>`;
+  s.innerHTML=h;curDev=s.value||'D001';
+}
+async function switchDevice(){curDev=document.getElementById('curDev').value;refresh();if(curPage==='history')loadHistoryHours(1);if(curPage==='model')loadModel();if(curPage==='alarm')loadAlarms();if(curPage==='settings')loadSetting();if(curPage==='reset')loadMaintainInfo()}
+
+// ===== [1] 首页 =====
+async function loadHome(){
+  let s=await api('GET','/api/status?device='+curDev),st=s&&!s._unchanged?s.data:_cachedStatus;
+  if(!st){return}
+  _cachedStatus=st;
+  // PLC离线时首页全部空白，不闪旧数据
+  if(!st.connected){
+    document.getElementById('xGrid').innerHTML='';document.getElementById('yGrid').innerHTML='';
+    document.getElementById('gaugeHome').innerHTML='<div style="text-align:center;padding:60px;color:var(--t)">PLC 未连接<br><span style="font-size:12px;color:#64748b">系统正在自动重连，请稍候...</span></div>';
+    document.getElementById('hiScores').innerHTML='';
+    document.getElementById('rulDays').textContent='--';
+    document.getElementById('degRate').textContent='--';
+    for(let k of['精滤油温','极化油温','一级油压','差压1','真空度']){
+      let el=document.getElementById('kv-'+k);if(el)el.innerHTML='--';
+    }
+    return
+  }
+  let d=await api('GET','/api/latest?device='+curDev);
+  if(d&&!d._unchanged&&d.data){_cachedLatest=d.data;loadHomeData(d.data,st)}
+  else if(_cachedLatest)loadHomeData(_cachedLatest,st);
+}
+async function loadHomeData(v,st){
+  // 油液健康仪表 + 评分 + 剩余寿命 + 趋势图
+  let dg=await api('GET','/api/degradation?device='+curDev);
+  if(dg&&dg.data&&dg.data.level!=='no_data'){
+    let r=dg.data,old=document.getElementById('gaugeHome');if(typeof echarts==='undefined'){old.innerHTML='<div style=\"text-align:center;padding:40px;color:var(--tb);font-size:28px\">'+r.hi.toFixed(1)+'%</div>';return;}
+    let ex=echarts.getInstanceByDom(old);if(ex)ex.dispose();
+    let gc=echarts.init(old),col=r.hi>=90?'#22c55e':r.hi>=50?'#f59e0b':r.hi>=30?'#ef4444':'#dc2626';
+    gc.setOption({animation:false,series:[{type:'gauge',min:0,max:100,radius:'85%',center:['50%','58%'],startAngle:210,endAngle:-30,
+      detail:{fontSize:32,fontWeight:'bold',color:col,offsetCenter:[0,'68%'],formatter:'{value}%'},
+      title:{show:true,offsetCenter:[0,'36%'],fontSize:11,color:'#94a3b8'},
+      data:[{value:r.hi,name:'健康指数'}],
+      axisLine:{lineStyle:{width:10,color:[[0.25,'#ef4444'],[0.40,'#f59e0b'],[0.60,'#3b82f6'],[1,'#22c55e']]}},
+      axisTick:{distance:-6,length:3,lineStyle:{color:'#64748b',width:1}},
+      splitLine:{distance:-10,length:6,lineStyle:{color:'#94a3b8',width:1.2}},
+      axisLabel:{distance:-20,fontSize:8,color:'#94a3b8'},
+      pointer:{length:'50%',width:4,itemStyle:{color:col}},
+      anchor:{show:true,size:8,itemStyle:{color:col}}
+    }]});
+    // 实测值：用oil_XX索引取真实值（索引映射见config.py）
+    let oq=P.oil_quality||[];
+    let oGet=function(name){
+      let p=oq.find(x=>x.name===name);
+      if(!p)return 0;
+      let idx=(p.idx!==undefined&&p.idx!==null)?p.idx:p.addr;
+      if(idx===undefined||idx===null)return 0;
+      return parseFloat(v['oil_'+String(idx).padStart(2,'0')])||0
+    }
+    let rawVis=oGet('运动粘度')||0;
+    let rawWater=oGet('含水率')||0;
+    let pv=oGet('污染度等级2'),dv=oGet('介电常数'),mv=oGet('铁磁24H总数');
+    let vals={vis:rawVis,water:rawWater,pollution:pv!=null?pv:'--',dielec:dv!=null?dv:'--',metal:mv!=null?mv:'--'};
+    let names={vis:'粘度',water:'水分',pollution:'污染度',dielec:'介电常数',metal:'磨粒'};
+    let dh='';for(let[k,vv]of Object.entries(r.scores)){let sc=Math.round(100-vv),cl=sc>=70?'#4ade80':sc>=40?'#fbbf24':'#f87171';dh+='<tr><td>'+names[k]+'</td><td>'+vals[k]+'</td><td style=\"color:'+cl+';font-weight:600\">'+sc+'分</td><td>'+r.weights[k]+'%</td></tr>'}
+    document.getElementById('hiScores').innerHTML=dh;
+    let dr=r.degradation_rate||0,drText='',rulText='';
+    let rd=Math.round(r.rul_hours/24);
+    if(rd>0) rulText=rd;
+    else rulText='--';
+    if(dr>0){
+      let weekly=(1-Math.exp(-dr*168))*100;
+      drText=(weekly<0.01?'<0.01':weekly.toFixed(2))+'%/周'
+    }else{drText='--'}
+    document.getElementById('rulDays').textContent=rulText;
+    document.getElementById('degRate').textContent=drText;
+  }else{
+    let rsn=dg&&dg.data?dg.data.reason||'':(dg&&dg.msg)||'';
+    document.getElementById('gaugeHome').innerHTML='<div style="text-align:center;padding:50px;color:var(--t)">暂无油液数据'+(rsn?'<br><span style="font-size:10px">'+rsn+'</span>':'')+'</div>';
+    document.getElementById('hiScores').innerHTML='<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--t)">暂无评分数据</td></tr>';
+  }
+  // 设备状态
+  loadStatusData(st);
+}
+
+// ===== [2] 参数 =====
+async function loadParams(){
+  let s=await api('GET','/api/status?device='+curDev),st=s&&!s._unchanged?s.data:_cachedStatus;
+  if(!st||!st.connected){document.getElementById('sysParams').innerHTML='';document.getElementById('oilParams').innerHTML='';return}
+  let d=await api('GET','/api/latest?device='+curDev);
+  if(d&&!d._unchanged&&d.data){_cachedLatest=d.data;loadParamsData(d.data)}
+  else if(_cachedLatest)loadParamsData(_cachedLatest);
+}
+function loadParamsData(v){
+  // 系统参数
+  let scats=[['🌡 温度','#3b82f6',['精滤油温','极化油温','阀前油温']],['⚖ 压力','#f59e0b',['一级油压','二级油压','极化油压','真空度','差压1','差压2']],['⚡ 极化','#8b5cf6',['正极化系数','负极化系数','正极化调节','负极化调节']],['🔔 状态','#22c55e',['阀前油温开关','差压1报警','差压2报警','极化油压高','真空度高']],['📤 输出','#06b6d4',['正极输出','负极输出']]];
+  let sh='';for(let g of scats){sh+=`<div class="cat-head" style="color:${g[1]}">${g[0]}</div>`;for(let k of g[2]){let p=P.system_params.find(x=>x.key===k),val=v[k],ok=val!==undefined&&val!==null;sh+=`<div class="param-item"><div class="pn" title="${p?p.desc:''}">${k}</div><div class="pv" style="color:${ok?'var(--tb)':'#94a3b8'}">${ok?val.toFixed(p&&(p.unit==='bar'||p.unit==='Pa')?2:1):'--'}<span class="pu">${p?p.unit:''}</span></div></div>`}}
+  document.getElementById('sysParams').innerHTML=sh;
+  // 油品品质（数据直读传感器，不再推算）
+  let ocats=[['基础物性','#3b82f6',[0,1,2,3]],['水分','#06b6d4',[4,5,6]],['铁磁磨粒','#ef4444',[7,8,9,10,11,12,13]],['非铁磁磨粒','#f59e0b',[14,15,16,17,18,19]],['趋势统计','#8b5cf6',[20,21,22,23]],['介电常数','#a78bfa',[24]],['清洁度','#22c55e',[25,26,27,28,29,30]]];
+  let oh='',oq=P.oil_quality||[];
+  for(let g of ocats){let items=g[2].map(i=>oq[i]).filter(p=>p);if(!items.length)continue;oh+='<div class=\"cat-head\" style=\"color:'+g[1]+'\">'+g[0]+'</div>';for(let p of items){let idx=(p.idx!==undefined&&p.idx!==null)?p.idx:(p.addr!==undefined?p.addr:null),val=idx!=null?v['oil_'+String(idx).padStart(2,'0')]:undefined,ok=val!==undefined&&val!==null;oh+='<div class=\"param-item\"><div class=\"pn\" title=\"'+(p.desc||'')+'\">'+p.name+'</div><div class=\"pv\" style=\"color:'+(ok?'var(--tb)':'#94a3b8')+'\">'+(ok?parseFloat(val).toFixed(p.name==='含水率'?0:2):'--')+'</div></div>'}}
+  document.getElementById('oilParams').innerHTML=oh;
+}
+
+// ===== [3] 设备状态 =====
+function loadStatusData(st){
+  let off=!st.connected;
+  // X输入（仅显示漏油、电机相关，跳过阀前油压开关）
+  let skip=['阀前油压开关'];
+  let xD={'漏油检查开关1':'漏检1','漏油检查开关2':'漏检2','漏油检查开关3':'漏检3','漏油检查开关4':'漏检4','电机温度高开关':'电机超温','电机电压异常开关':'电压异常','电机电流异常开关':'电流过大','正极控制端异常':'正极故障','负极控制端异常':'负极故障'};
+  let xh='';for(let p of P.x_inputs){
+    if(skip.includes(p.name)) continue;
+    if(off){xh+='<div class=\"param-item\" style=\"border-left:3px solid #94a3b8\"><div class=\"pn\">'+p.name+'</div><div class=\"pv\" style=\"font-size:13px;color:#94a3b8\">离线</div></div>';continue}
+    let on=st.x_states&&st.x_states[p.name];
+    let txt=on?'⚠ 异常':'✓ 正常',cl=on?'#ef4444':'#22c55e';
+    xh+='<div class=\"param-item\" title=\"'+(xD[p.name]||'')+'\" style=\"border-left:3px solid '+cl+'\"><div class=\"pn\">'+p.name+'</div><div class=\"pv\" style=\"color:'+cl+'\">'+txt+'</div></div>';
+  }
+  document.getElementById('xGrid').innerHTML=xh;
+  // Y执行器
+  let yh='';for(let p of P.y_outputs){
+    if(off){yh+='<div class=\"param-item\" style=\"border-left:3px solid #94a3b8\"><div class=\"pn\">'+p.name+'</div><div class=\"pv\" style=\"font-size:13px;color:#94a3b8\">离线</div></div>';continue}
+    let on=st.y_states&&st.y_states[p.name];
+    let txt=on?'▶ 运行中':'■ 已停止',cl=on?'#22c55e':'#94a3b8';
+    yh+='<div class=\"param-item\" style=\"border-left:3px solid '+cl+'\"><div class=\"pn\">'+p.name+'</div><div class=\"pv\" style=\"color:'+cl+'\">'+txt+'</div></div>';
+  }
+  document.getElementById('yGrid').innerHTML=yh;
+}
+
+// ===== [4] 控制 =====
+async function loadControl(){let s=await api('GET','/api/status?device='+curDev),st=s&&!s._unchanged?s.data:_cachedStatus;if(st)loadControlData(st)}
+function loadControlData(st){
+  document.getElementById('ctrlOff').style.display=st.connected?'none':'block';
+  let y=P.y_outputs||[],running=[],stopped=[],icons={'精过滤加热':'🔥','极化加热':'⚡','真空泵控制':'🌀','进油电磁阀':'💧','油泵':'⛽','极化启停输出':'🔌'};
+  for(let p of y){
+    let on=st.connected&&st.y_states&&st.y_states[p.name];
+    let stCl=st.connected?(on?'#22c55e':'#94a3b8'):'#94a3b8';
+    let stTxt=st.connected?(on?'● 运行中':'○ 已停止'):'离线';
+    let btn=!st.connected?'<span style="color:#94a3b8;font-size:11px">PLC离线</span>':(on?'<a class="btn sm" style="background:#ef4444;border-color:#ef4444;color:#fff" onclick="toggleCtrl('+p.addr+',0,\''+p.name+'\')">⏹ 停止</a>':'<a class="btn primary sm" onclick="toggleCtrl('+p.addr+',1,\''+p.name+'\')">▶ 启动</a>');
+    let card='<div class="kpi" data-addr="'+p.addr+'" style="border-left:3px solid '+stCl+'"><div style="font-size:14px;font-weight:600;color:var(--tb);margin-bottom:6px">'+(icons[p.name]||'')+' '+p.name+'</div><div class="ctrl-st" style="font-size:13px;color:'+stCl+';margin-bottom:8px">'+stTxt+'</div><div>'+btn+'</div></div>';
+    if(on) running.push(card); else stopped.push(card);
+  }
+  let ch='<div style="grid-column:1/-1;font-size:11px;color:#22c55e;font-weight:600;margin-bottom:2px">▶ 运行中（'+running.length+'）</div>'+running.join('');
+  ch+='<div style="grid-column:1/-1;font-size:11px;color:#94a3b8;font-weight:600;margin:10px 0 2px">■ 已停止（'+stopped.length+'）</div>'+stopped.join('');
+  document.getElementById('ctrlList').innerHTML=ch||'<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--t)">无控制项</div>';
+}
+let ctrlAddr,ctrlState,ctrlName,ctrlPending=false;
+async function toggleCtrl(addr,state,name){
+  ctrlAddr=addr;ctrlState=state;ctrlName=name;
+  let m=document.getElementById('pwdModal'),t=document.getElementById('pwdHint'),i=document.getElementById('pwdInput');
+  t.textContent=(state?'启动':'停止')+'「'+name+'」';
+  i.value='';_updatePwdLimit();m.style.display='flex';setTimeout(()=>i.focus(),100)
+}
+function optimisticUpdate(addr, targetState){
+  let card=document.querySelector('.kpi[data-addr="'+addr+'"]');
+  if(!card)return;
+  let st=card.querySelector('.ctrl-st'),cl=targetState?'#22c55e':'#94a3b8';
+  st.textContent=targetState?'● 运行中':'○ 已停止';st.style.color=cl;
+  card.style.borderLeftColor=cl;
+  card.classList.add('ctrl-pending');
+  ctrlPending=true;
+}
+// 密码验证本地限制：5分钟内最多5次错误，之后锁定10分钟
+let _pwdAttempts=[],_pwdLockedUntil=0;
+function _updatePwdLimit(){
+  let now=Date.now(),el=document.getElementById('pwdLimit');
+  if(!el)return;
+  if(_pwdLockedUntil>0&&now<_pwdLockedUntil){
+    let remain=Math.ceil((_pwdLockedUntil-now)/60000);
+    el.textContent='已锁定，'+remain+'分钟后重试';
+  }else{
+    _pwdAttempts=_pwdAttempts.filter(t=>now-t<600000);
+    let recent5m=_pwdAttempts.filter(t=>now-t<300000);
+    let remaining=5-recent5m.length;
+    if(remaining<=0){el.textContent='密码错误次数过多，已锁定10分钟'}
+    else if(remaining<=2){el.textContent='注意：还剩'+remaining+'次机会'}
+    else{el.textContent=''}
+  }
+}
+function submitPwd(){
+  let now=Date.now();
+  if(_pwdLockedUntil>0&&now<_pwdLockedUntil){
+    let remain=Math.ceil((_pwdLockedUntil-now)/60000);
+    toast('密码尝试次数过多，请'+remain+'分钟后再试','err');return;
+  }
+  let pw=document.getElementById('pwdInput').value;if(!pw)return;
+  // 清理超过10分钟的旧记录
+  _pwdAttempts=_pwdAttempts.filter(t=>now-t<600000);
+  // 检查5分钟内失败次数
+  let recent5m=_pwdAttempts.filter(t=>now-t<300000);
+  if(recent5m.length>=5){_pwdLockedUntil=now+600000;toast('密码错误次数过多，已锁定10分钟','err');_updatePwdLimit();return}
+  api('POST','/api/login',{username:me.username,password:pw}).then(ok=>{
+    if(!ok||ok.code!==0){
+      _pwdAttempts.push(now);_updatePwdLimit();
+      let remaining=5-recent5m.length-1;
+      let tip='密码错误';
+      if(remaining>0)tip+='，还剩'+remaining+'次机会';
+      else tip+='，已锁定10分钟';
+      toast(tip,'err');
+      return;
+    }
+    // 验证成功，清除记录
+    _pwdAttempts=[];_pwdLockedUntil=0;_updatePwdLimit();
+    document.getElementById('pwdModal').style.display='none';
+    // 换油重置操作
+    if(_resetAction){_resetAction=false;_doOilReset();return}
+    if(!confirm('确认'+ctrlName+' '+(ctrlState?'启动':'停止')+'？\n请确保现场安全！'))return;
+    // 乐观更新：立即显示目标状态 + 脉冲动画
+    optimisticUpdate(ctrlAddr, ctrlState);
+    api('POST','/api/control',{addr:ctrlAddr,state:ctrlState?1:0,device:curDev}).then(d=>{
+      if(d&&d.code===0)toast(ctrlName+' '+(ctrlState?'已启动':'已停止'));
+      // 保持乐观状态2秒后再同步PLC真实值，让用户看到操作确实执行了
+      setTimeout(()=>{ctrlPending=false;loadControl()}, 2000);
+    }).catch(()=>{ctrlPending=false;setTimeout(()=>loadControl(),2000)})
+  })
+}
+function closePwd(){document.getElementById('pwdModal').style.display='none'}
+
+// ===== [5] 历史 =====
+let hourRange=24,histPage=1,histTotal=0,histQuery='';
+function highlightHistBtn(h){document.querySelectorAll('.hist-btn').forEach(b=>b.classList.remove('active'));let ab=document.querySelector('.hist-btn[data-h=\"'+h+'\"]');if(ab)ab.classList.add('active')}
+function buildHistUrl(page){let u='/api/history?device='+curDev+'&limit=100&page='+page;if(histQuery)u+=histQuery;else u+='&hours='+hourRange;return u}
+async function loadHistoryHours(h){hourRange=h;histQuery='';histPage=1;highlightHistBtn(h);let d=await api('GET',buildHistUrl(1));if(d)renderHistory(d)}
+async function loadHistory(){let s=document.getElementById('hs').value,st=document.getElementById('hst').value||'00:00',e=document.getElementById('he').value,et=document.getElementById('het').value||'23:59';if(!s||!e)return toast('请选择日期范围','err');histQuery='&start='+s+'T'+st+'&end='+e+'T'+et;histPage=1;hourRange=0;highlightHistBtn(0);let d=await api('GET',buildHistUrl(1));if(d)renderHistory(d)}
+async function loadHistoryPage(p){histPage=p;let d=await api('GET',buildHistUrl(p));if(d)renderHistory(d)}
+function renderHistory(d){let rows=d.data,ks=['精滤油温','极化油温','一级油压','二级油压','真空度','差压1','差压2','正极化系数','负极化系数'];let h='';histTotal=d.total||0;document.getElementById('histCount').textContent=histTotal;for(let r of rows){let t=r.timestamp.substr(0,19);let cells=ks.map(k=>{let v=r[k];return v!=null&&v!==undefined?'<td>'+v.toFixed(k==='正极化系数'||k==='负极化系数'?0:2)+'</td>':'<td style=\"color:#64748b\">--</td>'}).join('');h+='<tr><td style=\"white-space:nowrap;font-size:11px\">'+t+'</td>'+cells+'</tr>'}document.querySelector('#histTable tbody').innerHTML=h||'<tr><td colspan=\"10\" style=\"text-align:center;padding:16px;color:var(--t)\">无数据</td></tr>';renderPager()}
+function renderPager(){let ph=document.getElementById('histPager'),tp=Math.ceil(histTotal/100);if(tp<=1){ph.innerHTML='';return}let p='';if(histPage>1)p+='<a class=\"btn sm\" onclick=\"loadHistoryPage('+(histPage-1)+')\">◀ 上一页</a>';p+='<span style=\"margin:0 8px;color:var(--t)\">第 <b>'+histPage+'</b>/'+tp+' 页</span>';if(histPage<tp)p+='<a class=\"btn sm primary\" onclick=\"loadHistoryPage('+(histPage+1)+')\">下一页 ▶</a>';ph.innerHTML=p}
+function exportCSV(){let s=document.getElementById('hs').value,st=document.getElementById('hst').value||'00:00',e=document.getElementById('he').value,et=document.getElementById('het').value||'23:59',u='/api/export?device='+curDev;if(s&&e)u+='&start='+s+'T'+st+'&end='+e+'T'+et;window.open(u,'_blank')}
+
+// ===== [7] 报警 =====
+let alarmStatus='',alarmPage=1,alarmTotal=0;
+async function loadAlarms(st,p){p=p||1;alarmStatus=st||'';alarmPage=p;document.querySelectorAll('#p-alarm .alarm-filter').forEach(b=>b.classList.remove('active'));let ca=document.querySelector('#p-alarm .alarm-filter[data-as=\"'+alarmStatus+'\"]');if(ca)ca.classList.add('active');let u='/api/alarms?limit=50&page='+p;if(alarmStatus)u+='&status='+alarmStatus;let d=await api('GET',u);if(!d)return;alarmTotal=d.total||0;let h='';for(let r of d.data){let lv=r.level==='danger'?'danger':'warn',stTag=r.status==='active'?'danger':r.status==='processing'?'warn':'dim';let act=r.status==='active'?'<a class=\"btn sm\" onclick=\"procAlarm('+r.id+')\">处理</a> <a class=\"btn sm danger\" onclick=\"resAlarm('+r.id+')\">解决</a>':r.status==='processing'?'<a class=\"btn sm\" onclick=\"resAlarm('+r.id+')\">解决</a>':'';h+='<tr><td>'+esc(r.device_id)+'</td><td>'+esc(r.timestamp)+'</td><td>'+esc(r.alarm_name)+'</td><td><span class=\"tag '+lv+'\">'+(r.level==='danger'?'危险':'预警')+'</span></td><td><span class=\"tag '+stTag+'\">'+(r.status==='active'?'激活':r.status==='processing'?'处理中':'已解决')+'</span></td><td>'+act+'</td></tr>'}document.getElementById('alarmList').innerHTML=h||'<tr><td colspan=\"6\" style=\"text-align:center;padding:16px;color:var(--t)\">✅ 无报警</td></tr>';let ph=document.getElementById('alarmPager'),tp=Math.ceil(alarmTotal/50);if(tp<=1){ph.innerHTML='';return}let pg='';if(alarmPage>1)pg+='<a class=\"btn sm\" onclick=\"loadAlarms(alarmStatus,'+(alarmPage-1)+')\">◀ 上一页</a>';pg+='<span style=\"margin:0 8px;color:var(--t)\">第 <b>'+alarmPage+'</b>/'+tp+' 页</span>';if(alarmPage<tp)pg+='<a class=\"btn sm primary\" onclick=\"loadAlarms(alarmStatus,'+(alarmPage+1)+')\">下一页 ▶</a>';ph.innerHTML=pg}
+async function procAlarm(id){await api('PUT','/api/alarms/'+id+'/process');loadAlarms(alarmStatus,alarmPage)}
+async function resAlarm(id){let n=prompt('处理备注(可选):');if(n===null)return;await api('PUT','/api/alarms/'+id+'/resolve',{note:n||''});loadAlarms(alarmStatus,alarmPage)}
+
+// ===== [8] 设置 =====
+async function loadUsers(){let d=await api('GET','/api/users');if(!d)return;let h='';for(let r of d.data)h+=`<tr><td>${esc(r.username)}</td><td>${esc(r.role==='admin'?'管理员':'运维员')}</td><td>${esc(r.created_at)}</td><td>${me.role==='admin'&&r.username!=='admin'?`<a class="btn sm danger" onclick="delUser(${r.id})">删除</a>`:''}</td></tr>`;document.getElementById('userList').innerHTML=h}
+async function addUser(){let u=document.getElementById('uname').value,p=document.getElementById('upass').value,r=document.getElementById('urole').value;if(!u||!p)return toast('请填写完整','err');await api('POST','/api/users',{username:u,password:p,role:r});loadUsers()}
+async function delUser(id){if(confirm('确认删除？')){await api('DELETE','/api/users/'+id);loadUsers()}}
+async function changePwd(){let o=document.getElementById('oldPw').value,n=document.getElementById('newPw').value;if(!o||!n)return toast('请填写完整','err');if(n.length<8)return toast('新密码至少8位','err');let d=await api('POST','/api/change-password',{old_password:o,new_password:n});if(d&&d.code===0){document.getElementById('oldPw').value='';document.getElementById('newPw').value='';toast('密码已修改')}}
+async function loadDevices(){let d=await api('GET','/api/devices');if(!d)return;let h='';for(let r of d.data)h+=`<tr><td>${esc(r.id)}</td><td>${esc(r.name)}</td><td>${esc(r.plc_ip)}:${r.plc_port}</td><td><a class="btn sm danger" onclick="delDevice('${esc(r.id)}')">删除</a></td></tr>`;document.getElementById('devList').innerHTML=h}
+async function addDevice(){let i=document.getElementById('did').value,n=document.getElementById('dname').value,p=document.getElementById('dip').value,pt=parseInt(document.getElementById('dport').value);if(!i||!n)return toast('填写编号和名称','err');await api('POST','/api/devices',{id:i,name:n,plc_ip:p,plc_port:pt});loadDevices();loadDeviceList()}
+async function delDevice(id){if(confirm('删除 '+id+' ？')){await api('DELETE','/api/devices/'+id);loadDevices();loadDeviceList()}}
+
+async function loadSetting(){let s=await api('GET','/api/status?device='+curDev),st=s&&!s._unchanged?s.data:_cachedStatus;if(!st)return;document.getElementById('infoDev').textContent=curDev;document.getElementById('infoPLC').textContent=st.plc||'--';document.getElementById('setCnt').textContent=(st.count||0)+' 次';document.getElementById('setSt').innerHTML=st.connected?'<span style=\"color:#22c55e\">● 已连接</span>':'<span style=\"color:#ef4444\">● 已断开（自动重连中）</span>'}
+
+let _resetAction=false;
+function resetOilCycle(){
+  if(!confirm('⚠ 确认换油重置？\n\n将清除当前设备所有历史数据！\n建议先导出 CSV 备份。'))return;
+  _resetAction=true;
+  let m=document.getElementById('pwdModal'),t=document.getElementById('pwdHint'),i=document.getElementById('pwdInput');
+  t.textContent='换油重置操作';i.value='';_updatePwdLimit();m.style.display='flex';setTimeout(()=>i.focus(),100)
+}
+async function _doOilReset(){
+  let d=await api('POST','/api/oil-reset',{device:curDev});
+  if(d&&d.code===0){document.getElementById('resetMsg').innerHTML='<span style=\"color:#22c55e\">✅ 已清除 '+d.deleted+' 条旧数据，请前往模型页手动校准新油基线</span>';loadMaintainInfo()}
+  else toast('重置失败','err')
+}
+async function triggerBaselineCalibrate(){
+  if(!me||me.role!=='admin'){toast('仅管理员可操作','err');return}
+  if(!confirm('📏 基线校准（阶段一）\n\n将用当前数据学习新油基线。\n请确认设备内为新油且运行稳定。'))return;
+  toast('正在校准，请稍候...','ok');
+  let d=await api('POST','/api/model/start-calibration',{device:curDev});
+  if(!d)return;
+  if(d.data&&d.data.started){toast('✅ 基线校准完成！');loadModel()}
+  else{toast(d.data?d.data.reason:'校准失败','err')}
+}
+async function loadModel(){
+  let m=await api('GET','/api/model/status?device='+curDev);
+  // 参考值（依据 NB/SH/T 0973-2018 风电齿轮箱换油指标）
+  // 运动粘度: ISO VG 320 新油，换油阈值变化率 >±10%
+  // 水分: 换油阈值 >600 mg/kg (0.06%)，新油参考 <50 mg/kg (0.005%)
+  // 污染度/介电常数/磨粒: 国标未规定，取行业经验值
+  let refBaseline={运动粘度:320,含水率:0.005,污染度等级2:16,介电常数:2.1,铁磁24H总数:20};
+  let defs={粘度:'cSt',水分:'%',污染度:'ISO',介电常数:'ε',磨粒:'个'};
+  if(!m||!m.data||m.data.status==='uncalibrated'){
+    document.getElementById('mdStatus').innerHTML='<span style="color:#f59e0b">尚未校准（使用国际参考值）</span>';
+
+    let bh='';
+    [{n:'运动粘度',k:'粘度'},{n:'含水率',k:'水分'},{n:'污染度等级2',k:'污染度'},{n:'介电常数',k:'介电常数'},{n:'铁磁24H总数',k:'磨粒'}].forEach(p=>{
+      bh+='<tr><td>'+p.k+'</td><td>'+refBaseline[p.n]+' '+(defs[p.k]||'')+'</td><td style="color:#a5b4fc">国际参考</td></tr>'
+    });
+    document.getElementById('mdBase').innerHTML=bh;
+    // 退化率: 无国际标准，用默认 λ=0.000045 显示各参数参考值
+    let dh2='',refLambda=0.000045,refWeekly=(1-Math.exp(-refLambda*168))*100;
+    [{n:'粘度'},{n:'水分'},{n:'污染度'},{n:'介电常数'},{n:'磨粒'}].forEach(p=>{
+      dh2+='<tr><td>'+p.n+'</td><td>'+refWeekly.toFixed(4)+'%/周</td><td>参考值</td></tr>'
+    });
+    document.getElementById('mdDrift').innerHTML=dh2;
+    return
+  }
+  let d=m.data;
+  let calDone=d.stage1_done;
+  let stText=calDone?'<span style="color:#22c55e">已校准</span>'+(d.stage2_done?'<span style="color:#22c55e"> + 退化率</span>':''):(d.status==='calibrating'?'<span style="color:#f59e0b">校准进行中（使用国际参考值）</span>':'<span style="color:#f59e0b">未校准（使用国际参考值）</span>');
+  document.getElementById('mdStatus').innerHTML=stText;
+
+  // 基线表
+  let bh='';
+  [{n:'运动粘度',k:'粘度'},{n:'含水率',k:'水分'},{n:'污染度等级2',k:'污染度'},{n:'介电常数',k:'介电常数'},{n:'铁磁24H总数',k:'磨粒'}].forEach(p=>{
+    let v=d.key_baselines&&d.key_baselines[p.n];
+    if(v!==undefined)bh+='<tr><td>'+p.k+'</td><td>'+v.toFixed(2)+' '+(defs[p.k]||'')+'</td><td>数据学习</td></tr>'
+  });
+  if(!bh){
+    [{n:'运动粘度',k:'粘度'},{n:'含水率',k:'水分'},{n:'污染度等级2',k:'污染度'},{n:'介电常数',k:'介电常数'},{n:'铁磁24H总数',k:'磨粒'}].forEach(p=>{
+      bh+='<tr><td>'+p.k+'</td><td>'+refBaseline[p.n]+' '+(defs[p.k]||'')+'</td><td style="color:#a5b4fc">国际参考</td></tr>'
+    })
+  }
+  document.getElementById('mdBase').innerHTML=bh;
+  // 退化率表
+  let dh='',_modelNames={运动粘度:'粘度',含水率:'水分',污染度等级2:'污染度',介电常数:'介电常数',铁磁24H总数:'磨粒'};
+  for(let[n,v]of Object.entries(d.key_drift||{})){
+    let kn=_modelNames[n]||n,pct=v.weekly_pct;dh+='<tr><td>'+kn+'</td><td>'+v.weekly_pct.toFixed(4)+'%/周</td><td>'+v.raw_hourly.toExponential(2)+'/h</td></tr>'
+  }
+  if(!dh){
+    // 默认退化率 λ=0.000045/h，各参数按相同退化速度显示参考值
+    let refLambda=0.000045,refWeekly=(1-Math.exp(-refLambda*168))*100;
+    [{n:'粘度'},{n:'水分'},{n:'污染度'},{n:'介电常数'},{n:'磨粒'}].forEach(p=>{
+      dh+='<tr><td>'+p.n+'</td><td>'+refWeekly.toFixed(4)+'%/周</td><td>参考值</td></tr>'
+    })
+  }
+  document.getElementById('mdDrift').innerHTML=dh;
+}
+
+async function loadMaintainInfo(){
+  let d=await api('GET','/api/data-stats?device='+curDev);
+  if(d){document.getElementById('maintCnt').textContent=d.data.count;document.getElementById('maintSize').textContent=d.data.size_mb+' MB'}
+}
+
+</script>
+<div id="pwdModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#111827;border:1px solid #1e293b;border-radius:12px;padding:24px;width:360px;max-width:90vw">
+    <div style="font-size:15px;font-weight:600;color:#f1f5f9;margin-bottom:4px">🔐 操作验证</div>
+    <div style="font-size:12px;color:#94a3b8;margin-bottom:4px" id="pwdHint"></div>
+    <div style="font-size:11px;color:#f87171;margin-bottom:12px;min-height:16px" id="pwdLimit"></div>
+    <input id="pwdInput" type="password" placeholder="请输入操作密码" onkeydown="if(event.key==='Enter')submitPwd()" style="width:100%;padding:10px 12px;background:#1a1f2e;border:1px solid #334155;border-radius:6px;color:#f1f5f9;font-size:14px;margin-bottom:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <a class="btn sm" onclick="closePwd()">取消</a>
+      <a class="btn primary sm" onclick="submitPwd()">确认</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

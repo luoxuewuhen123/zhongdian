@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>网络拓扑图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:15px 'Microsoft YaHei',sans-serif;background:#0f172a;color:#e2e8f0;padding:20px}
+h1{text-align:center;font-size:24px;color:#f8fafc;margin-bottom:4px}
+.sub{text-align:center;font-size:13px;color:#94a3b8;margin-bottom:20px}
+
+.topology{display:flex;flex-direction:column;align-items:center;gap:0}
+
+/* 机房 */
+.room{border:2px dashed #1e40af;border-radius:12px;padding:20px 40px;margin-bottom:0;min-width:800px;text-align:center}
+.room-title{color:#60a5fa;font-size:14px;font-weight:bold;margin-bottom:16px}
+.room-row{display:flex;justify-content:center;align-items:center;gap:40px;flex-wrap:wrap}
+.room-row .arrow{color:#60a5fa;font-size:20px;font-weight:bold}
+
+/* 设备卡片 */
+.card{background:#1e293b;border-radius:10px;padding:14px 20px;text-align:center;min-width:180px}
+.card.server{background:linear-gradient(180deg,#3b82f6,#1d4ed8)}
+.card.switch{background:linear-gradient(180deg,#64748b,#334155)}
+.card.converter{background:#0f172a;border:1.5px solid #334155}
+.card.device{background:linear-gradient(180deg,#10b981,#047857)}
+.card .title{font-size:16px;font-weight:bold;color:#fff}
+.card .ip{font-size:12px;color:#94a3b8;margin-top:4px}
+.card.server .ip{color:#bfdbfe}
+.card.device .ip{color:#a7f3d0}
+.card .desc{font-size:11px;color:#64748b;margin-top:2px}
+
+/* 光纤链路 */
+.fiber-line{display:flex;align-items:center;justify-content:center;gap:0;margin:0}
+.fiber-line .line{width:3px;height:60px;background:#f59e0b;margin:0 30px}
+.fiber-line .label{color:#fbbf24;font-size:12px;background:#1e293b;padding:4px 14px;border-radius:6px;white-space:nowrap}
+
+/* 风机行 */
+.turbines{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin-top:0}
+.turbine{border:1.5px dashed #065f46;border-radius:12px;padding:16px 24px;min-width:260px;text-align:center}
+.turbine-title{color:#34d399;font-size:15px;font-weight:bold;margin-bottom:12px}
+.turbine .card{margin:6px 0}
+.turbine .wire{color:#34d399;font-size:18px;margin:4px 0}
+
+/* 图例 */
+.legend{display:flex;justify-content:center;gap:24px;margin-top:24px;font-size:12px;color:#94a3b8;flex-wrap:wrap}
+.legend .item{display:flex;align-items:center;gap:6px}
+.legend .dot{width:12px;height:12px;border-radius:3px}
+.legend .dot.server{background:#3b82f6}
+.legend .dot.switch{background:#64748b}
+.legend .dot.device{background:#10b981}
+.legend .dot.converter{background:#0f172a;border:1px solid #334155}
+.legend .dot.fiber{width:24px;height:0;border-top:3px dashed #f59e0b}
+.legend .dot.lan{width:24px;height:0;border-top:3px solid #60a5fa}
+
+.flow{text-align:center;color:#64748b;font-size:11px;margin-top:16px;line-height:1.8}
+</style>
+</head>
+<body>
+
+<h1>风电齿轮箱滤油机在线监测系统 — 网络拓扑图</h1>
+<div class="sub">每台风机通过光纤连接到中控机房服务器 · Modbus TCP · 10秒采集 · 支持1000台</div>
+
+<div class="topology">
+
+  <!-- 机房 -->
+  <div class="room">
+    <div class="room-title">🖥 中控机房</div>
+    <div class="room-row">
+      <div class="card server">
+        <div class="title">监测服务器</div>
+        <div class="ip">192.168.0.200 :5000</div>
+        <div class="desc">Windows Server</div>
+      </div>
+      <div class="arrow">── 网线 ──▶</div>
+      <div class="card switch">
+        <div class="title">核心交换机</div>
+        <div class="ip">48口千兆 + 光口</div>
+        <div class="desc">汇聚所有风机</div>
+      </div>
+      <div class="arrow">── 网线 ──▶</div>
+      <div class="card converter">
+        <div class="title" style="color:#cbd5e1">光电转换器 ×N</div>
+        <div class="ip">光纤 → 网线</div>
+        <div class="desc">每台风机一路</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 光纤 -->
+  <div class="fiber-line">
+    <div class="line"></div>
+    <div class="label">单模光纤（1号风机）</div>
+    <div class="line"></div>
+    <div class="label">单模光纤（2号风机）</div>
+    <div class="line"></div>
+    <div class="label">单模光纤（N号风机）</div>
+    <div class="line"></div>
+  </div>
+
+  <!-- 风机 -->
+  <div class="turbines">
+    <div class="turbine">
+      <div class="turbine-title">🌬 1号风机</div>
+      <div class="card device">
+        <div class="title">滤油机监测设备</div>
+        <div class="ip">192.168.0.150 :3000</div>
+      </div>
+      <div class="wire">│ 网线</div>
+      <div class="card converter">
+        <div class="title" style="color:#cbd5e1">光电转换器</div>
+        <div class="ip">网线 → 光纤</div>
+        <div class="desc">电信号转光信号</div>
+      </div>
+    </div>
+
+    <div class="turbine">
+      <div class="turbine-title">🌬 2号风机</div>
+      <div class="card device">
+        <div class="title">滤油机监测设备</div>
+        <div class="ip">192.168.0.151 :3000</div>
+      </div>
+      <div class="wire">│ 网线</div>
+      <div class="card converter">
+        <div class="title" style="color:#cbd5e1">光电转换器</div>
+        <div class="ip">网线 → 光纤</div>
+        <div class="desc">电信号转光信号</div>
+      </div>
+    </div>
+
+    <div class="turbine">
+      <div class="turbine-title">🌬 N号风机</div>
+      <div class="card device">
+        <div class="title">滤油机监测设备</div>
+        <div class="ip">192.168.0.15x :3000</div>
+      </div>
+      <div class="wire">│ 网线</div>
+      <div class="card converter">
+        <div class="title" style="color:#cbd5e1">光电转换器</div>
+        <div class="ip">网线 → 光纤</div>
+        <div class="desc">电信号转光信号</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 图例 -->
+<div class="legend">
+  <div class="item"><div class="dot server"></div> 服务器</div>
+  <div class="item"><div class="dot switch"></div> 交换机</div>
+  <div class="item"><div class="dot device"></div> 滤油机设备</div>
+  <div class="item"><div class="dot converter"></div> 光电转换器</div>
+  <div class="item"><div class="dot fiber"></div> 光纤</div>
+  <div class="item"><div class="dot lan"></div> 网线</div>
+</div>
+
+<div class="flow">
+  数据流：滤油机传感器 → PLC (Modbus TCP :3000) → 网线 → 光电转换器(电→光) → 光纤 → 光电转换器(光→电) → 网线 → 交换机 → 服务器 (:5000)
+</div>
+
+</body>
+</html>

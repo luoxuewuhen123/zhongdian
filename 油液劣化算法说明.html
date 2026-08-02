@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>油液健康指数（HI）算法说明</title>
+<style>
+:root{--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--t:#334155;--h:#0f172a;--pri:#2563eb;--ok:#16a34a;--warn:#d97706;--dg:#dc2626}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:17px/1.9 -apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t);max-width:900px;margin:0 auto;padding:40px 24px}
+h1{color:var(--h);font-size:30px;text-align:center;margin-bottom:8px}
+h2{color:var(--pri);font-size:22px;margin:40px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border)}
+h3{color:var(--h);font-size:18px;margin:20px 0 8px}
+p{margin:10px 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px 28px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.tag{padding:3px 12px;border-radius:12px;font-size:13px;font-weight:600;display:inline-block}
+.tag.ok{background:rgba(22,163,74,.12);color:var(--ok)}
+.tag.warn{background:rgba(217,119,6,.12);color:var(--warn)}
+.tag.dg{background:rgba(220,38,38,.12);color:var(--dg)}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:15px}
+th{background:#e2e8f0;padding:10px 14px;text-align:left;color:#1e293b;font-weight:700;border-bottom:2px solid var(--border)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);color:#334155}
+tr:hover td{background:#f1f5f9}
+.formula{background:#eff6ff;border-left:3px solid var(--pri);padding:14px 20px;border-radius:0 6px 6px 0;font-family:'Courier New',monospace;font-size:16px;margin:12px 0;overflow-x:auto;white-space:nowrap;color:#1e40af}
+.highlight{color:var(--ok);font-weight:700}
+.highlight2{color:var(--warn);font-weight:700}
+.highlight3{color:var(--pri);font-weight:700}
+.note{background:#fffbeb;border-left:3px solid var(--warn);padding:12px 18px;border-radius:0 6px 6px 0;font-size:14px;margin:12px 0;color:#92400e}
+.subtitle{text-align:center;color:#64748b;font-size:15px;margin-bottom:30px}
+ul{padding-left:24px}
+li{margin:6px 0}
+.gauge-demo{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin:16px 0}
+.gauge-block{text-align:center;padding:16px 20px;border-radius:10px;width:160px}
+.gauge-block .val{font-size:40px;font-weight:800}
+.gauge-block .lbl{font-size:13px;margin-top:4px;color:#64748b}
+.flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;font-size:14px;margin:12px 0}
+.flow-box{background:var(--card);border:1px solid var(--border);padding:10px 16px;border-radius:8px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.flow-arrow{color:var(--pri);font-size:20px;font-weight:700}
+.card p,.card li{color:#475569}
+@media(max-width:600px){
+  body{font-size:15px;padding:16px 12px}
+  h1{font-size:24px}
+  .formula{font-size:13px}
+  .gauge-demo{gap:10px}
+  .gauge-block{width:130px}.gauge-block .val{font-size:32px}
+}
+</style>
+</head>
+<body>
+
+<h1>🧪 油液健康指数（HI）算法说明</h1>
+<div class="subtitle">风电齿轮箱滤油机在线监测系统 · 基于 NB/SH/T 0973-2018 国标</div>
+
+<div class="card">
+  <h3>📖 什么是健康指数（HI）？</h3>
+  <p>健康指数是一个 <span class="highlight3">0~100%</span> 的数字，100% 代表新油状态，越接近 0% 代表油品越接近需要更换。你的滤油机有 <b>5种传感器</b> 在实时监测油品，HI 就是把这5种数据综合成一个容易理解的"分数"。</p>
+  <div class="gauge-demo">
+    <div class="gauge-block" style="background:rgba(34,197,94,.1)">
+      <div class="val" style="color:var(--ok)">95%</div>
+      <div class="lbl">油品良好</div>
+    </div>
+    <div class="gauge-block" style="background:rgba(245,158,11,.1)">
+      <div class="val" style="color:var(--warn)">60%</div>
+      <div class="lbl">注意观察</div>
+    </div>
+    <div class="gauge-block" style="background:rgba(239,68,68,.1)">
+      <div class="val" style="color:var(--dg)">25%</div>
+      <div class="lbl">需要更换</div>
+    </div>
+  </div>
+</div>
+
+<h2>1️⃣ 五指标权重分配</h2>
+<div class="card">
+  <p>五种传感器数据根据对油品劣化的"贡献度"分配不同权重。总权重之和 = 1.0：</p>
+  <table>
+    <tr><th>传感器指标</th><th>测量内容</th><th>权重</th><th>为什么是这个比例？</th></tr>
+    <tr><td><span class="highlight3">粘度</span></td><td>油液流动阻力（D0）</td><td><b>30%</b></td><td>齿轮油最重要的指标，粘度变化直接影响润滑效果</td></tr>
+    <tr><td><span class="highlight3">水分</span></td><td>含水量百分比（D12）</td><td><b>25%</b></td><td>水分破坏油膜、导致锈蚀，风电场环境湿度高</td></tr>
+    <tr><td><span class="highlight3">污染度</span></td><td>ISO清洁度等级（D58）</td><td><b>20%</b></td><td>颗粒物加速轴承磨损，ISO等级直接反映清洁程度</td></tr>
+    <tr><td><span class="highlight3">介电常数</span></td><td>油液电学特性（D48）</td><td><b>15%</b></td><td>反映油品氧化和添加剂消耗程度</td></tr>
+    <tr><td><span class="highlight3">磨粒</span></td><td>24h铁磁颗粒计数（D26）</td><td><b>10%</b></td><td>齿轮啮合产生金属屑，24小时累计趋势最有意义</td></tr>
+  </table>
+</div>
+
+<h2>2️⃣ 核心公式：HI 怎么算？</h2>
+<div class="card">
+  <h3>总公式</h3>
+  <div class="formula">HI = 1 − (0.30 × 粘度分 + 0.25 × 水分分 + 0.20 × 污染度分 + 0.15 × 介电分 + 0.10 × 磨粒分)</div>
+  <p>每一项"分"的取值范围是 <span class="highlight3">0 ~ 1</span>，0 代表跟新油一样好，1 代表已达到换油标准。HI 最终也落在 0~1 之间，乘以 100 就是仪表盘上的百分比。</p>
+
+  <h3>单项参数如何从"实测值"变成"0~1的分数"？</h3>
+  <p>需要三个东西：</p>
+  <ul>
+    <li><b>基线值</b>（新油值）：注入新油后由运维员手动触发校准</li>
+    <li><b>阈值</b>（换油点）：依据国标设置</li>
+    <li><b>当前实测值</b>：传感器每10秒采集</li>
+  </ul>
+  <div class="formula">分数 = (|当前值 − 基线值|) / (|阈值 − 基线值|)</div>
+  <p>结果限制在 0~1 之间。越接近 1 说明离换油点越近。</p>
+
+  <h3>举个例子：运动粘度</h3>
+  <p>新油粘度基线 = <span class="highlight3">320 cSt</span>，阈值 = 320 × 0.92 = <span class="highlight3">294 cSt</span>（降8%触发预警，国标是降10%换油）</p>
+  <table>
+    <tr><th>当前粘度</th><th>计算</th><th>分数</th><th>说明</th></tr>
+    <tr><td>320 cSt</td><td>(320−320)/(320−294) = 0/26</td><td><span class="tag ok">0.0</span></td><td>和新油一模一样</td></tr>
+    <tr><td>310 cSt</td><td>(320−310)/(320−294) = 10/26</td><td><span class="tag warn">0.38</span></td><td>开始轻微下降</td></tr>
+    <tr><td>300 cSt</td><td>(320−300)/(320−294) = 20/26</td><td><span class="tag warn">0.77</span></td><td>接近预警线</td></tr>
+    <tr><td>294 cSt</td><td>(320−294)/(320−294) = 26/26</td><td><span class="tag dg">1.00</span></td><td>达到阈值！</td></tr>
+  </table>
+</div>
+
+<h2>3️⃣ 五个参数的阈值设定</h2>
+<div class="card">
+  <table>
+    <tr><th>参数</th><th>基线来源</th><th>阈值公式</th><th>依据</th><th>方向</th></tr>
+    <tr>
+      <td>运动粘度</td><td>新油学习</td><td class="formula" style="padding:4px 8px;font-size:13px">基线 × 0.92</td>
+      <td>国标±10%换油，在线取±8%预警</td>
+      <td><span class="highlight2">越低越差</span></td>
+    </tr>
+    <tr>
+      <td>含水率</td><td>新油学习</td><td class="formula" style="padding:4px 8px;font-size:13px">max(150, 基线×2)</td>
+      <td>国标600PPM换油，在线预警取150~600</td>
+      <td><span class="highlight2">越高越差</span></td>
+    </tr>
+    <tr>
+      <td>污染度</td><td>ISO标准</td><td class="formula" style="padding:4px 8px;font-size:13px">S型曲线平滑映射</td>
+      <td>ISO 16≈0分，ISO 22≈1分</td>
+      <td><span class="highlight2">越高越差</span></td>
+    </tr>
+    <tr>
+      <td>介电常数</td><td>新油学习</td><td class="formula" style="padding:4px 8px;font-size:13px">基线 × 1.3</td>
+      <td>介质升高30%表示明显氧化</td>
+      <td><span class="highlight2">越高越差</span></td>
+    </tr>
+    <tr>
+      <td>铁磁磨粒(24H)</td><td>新油学习</td><td class="formula" style="padding:4px 8px;font-size:13px">max(50, 基线×3)</td>
+      <td>趋势型检测，3倍基线或50个为界</td>
+      <td><span class="highlight2">越高越差</span></td>
+    </tr>
+  </table>
+  <div class="note">💡 阈值不是固定的！注入新油后由运维员在模型页手动触发"新油基线"校准，系统自动检测温度稳定后开始学习。每台设备的新油不同，阈值也不同，这是"个性化"的。</div>
+</div>
+
+<h2>4️⃣ EMA平滑：消除传感器噪声</h2>
+<div class="card">
+  <p>传感器可能偶尔出现瞬间波动。用 <span class="highlight3">指数移动平均（EMA）</span> 来平滑数据，避免单次跳动误报。</p>
+  <div class="formula">EMA值 = α × 当前读数 + (1−α) × 上一次EMA值</div>
+  <p>我们取 <span class="highlight3">α = 0.2</span>，意味着每次"采纳"20%的新数据，80%保留历史趋势。较小的α值让HI更稳定，不易被瞬时噪声干扰。</p>
+  <table>
+    <tr><th>次数</th><th>传感器读数</th><th>EMA结果</th><th>说明</th></tr>
+    <tr><td>第1次</td><td>320.0</td><td>320.0</td><td>初始值</td></tr>
+    <tr><td>第2次</td><td>325.0</td><td>321.0</td><td>0.2×325 + 0.8×320 = 321.0，尖峰被压扁</td></tr>
+    <tr><td>第3次</td><td>319.0</td><td>320.6</td><td>0.2×319 + 0.8×321.0 = 320.6，逐渐回归</td></tr>
+    <tr><td>第4次</td><td>318.0</td><td>320.1</td><td>真实趋势慢慢被追踪到</td></tr>
+  </table>
+  <div class="note">💡 注意：油品HI的EMA系数（α=0.2）与温度传感器的平滑系数（α=0.3）不同。温度响应需要更快，而油品劣化是缓慢过程，用更小的α值避免误判。</div>
+</div>
+
+<h2>5️⃣ 污染度的Sigmoid归一化</h2>
+<div class="card">
+  <p>ISO清洁度等级是"对数级"的：ISO 19 比 ISO 16 脏 10 倍。直接线性打分不公平，所以用一个 <span class="highlight3">S型曲线（Sigmoid）</span> 来映射：</p>
+  <div class="formula">污染分 = 1 / (1 + e<sup>−0.8×(10<sup>(ISO−16)/3</sup> − 5.5)</sup>)</div>
+  <table>
+    <tr><th>ISO等级</th><th>污染颗粒数(相对)</th><th>污染分</th><th>解读</th></tr>
+    <tr><td>ISO 16</td><td>基准 ×1</td><td><span class="tag ok">0.50</span></td><td>清洁，半分</td></tr>
+    <tr><td>ISO 19</td><td>基准 ×10</td><td><span class="tag warn">0.73</span></td><td>轻微污染</td></tr>
+    <tr><td>ISO 22</td><td>基准 ×100</td><td><span class="tag dg">0.99</span></td><td>严重污染</td></tr>
+  </table>
+  <p>S型曲线的优势：中间段（ISO 17~20）变化敏感，容易发现早期恶化；两端变化平缓，不会因为特大/特小值剧烈波动。</p>
+</div>
+
+<h2>6️⃣ RUL：剩余寿命预测</h2>
+<div class="card">
+  <p>系统通过阶段二（每7天自动运行）计算的退化率，用 <span class="highlight3">指数退化模型</span> 推算油品还能用多久：</p>
+  <div class="formula">RUL(小时) = ln(HI当前 / 0.3) / λ</div>
+  <p><b>λ</b>（退化率）= 阶段二取头尾各20000条数据，对比温度稳定段内各油品指标的均值变化，加权计算出每小时退化速度。若退化率异常偏大，回退到默认值（λ=0.000045，约3年退化周期）。</p>
+  <table>
+    <tr><th>退化率(λ)</th><th>当前HI</th><th>预测剩余天数</th></tr>
+    <tr><td>0.0002（慢速退化）</td><td>90%</td><td><span class="tag ok">约 229 天</span></td></tr>
+    <tr><td>0.001（中速退化）</td><td>60%</td><td><span class="tag warn">约 29 天</span></td></tr>
+    <tr><td>0.003（快速退化）</td><td>40%</td><td><span class="tag dg">约 4 天</span></td></tr>
+  </table>
+  <p>如果油品健康天数 <b>从未恶化过</b>（λ=0），系统会用默认退化率（约3年），并标注"数据不足，仅供参考"。</p>
+</div>
+
+<h2>7️⃣ 两阶段学习</h2>
+<div class="card">
+  <div class="flow">
+    <div class="flow-box"><b>换油完成</b></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><b>阶段一</b><br><small>运维员手动触发</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><b>阶段二</b><br><small>每7天自动运行</small></div>
+  </div>
+  <table>
+    <tr><th>阶段</th><th>触发条件</th><th>做什么</th><th>数据来源</th></tr>
+    <tr>
+      <td><span class="tag ok">阶段一</span><br>基线学习</td>
+      <td>注入新油后，在模型页点击"开始基线校准"</td>
+      <td>
+        • 点击按钮后系统立即检查数据是否就绪（≥3000条 + 运行≥2小时 + 油温稳定）<br>
+        • 条件满足后自动触发：找油温稳定段（波动 &lt; 1.5℃）<br>
+        • 取稳定数据的前半段，掐头去尾10%后算均值 → 基线
+      </td>
+      <td>温度传感器 + 油品传感器</td>
+    </tr>
+    <tr>
+      <td><span class="tag warn">阶段二</span><br>退化率更新</td>
+      <td>数据 ≥ 10000条 + 运行 ≥ 7天</td>
+      <td>
+        • 取头尾各20000条数据，找到温度稳定段后算均值<br>
+        • 计算每小时退化速度（5项油品指标）<br>
+        • 自适应阈值：用实际波动范围（3σ）替代固定值
+      </td>
+      <td>头尾各2万行历史数据</td>
+    </tr>
+  </table>
+  <div class="note">⚠ 基线永久锁定！阶段一学完后不再自动修改，否则会"温水煮青蛙"——油慢慢老化，系统也慢慢适应，永远不报警。</div>
+</div>
+
+<h2>8️⃣ 完整数据流</h2>
+<div class="card">
+  <div class="flow" style="font-size:12px">
+    <div class="flow-box">传感器<br><small>每10秒采集</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">EMA平滑<br><small>α=0.2</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">异常值过滤<br><small>超出范围拒绝</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">归一化<br><small>0~1分数</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">加权求和<br><small>HI值</small></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">指数退化预测<br><small>RUL天数</small></div>
+  </div>
+</div>
+
+<h2>9️⃣ HI 等级划分</h2>
+<div class="card">
+  <table>
+    <tr><th>HI范围</th><th>等级</th><th>仪表盘颜色</th><th>建议操作</th></tr>
+    <tr><td>≥ 50%</td><td><span class="tag ok">正常</span></td><td style="color:var(--ok)">🟢 绿色</td><td>无需处理</td></tr>
+    <tr><td>30% ~ 50%</td><td><span class="tag warn">注意</span></td><td style="color:var(--warn)">🟡 黄色</td><td>关注趋势，安排检查</td></tr>
+    <tr><td>20% ~ 30%</td><td><span class="tag warn">警告</span></td><td style="color:#f97316">🟠 橙色</td><td>近期安排换油</td></tr>
+    <tr><td>&lt; 20%</td><td><span class="tag dg">危险</span></td><td style="color:var(--dg)">🔴 红色</td><td>立即安排换油</td></tr>
+  </table>
+</div>
+
+<div class="card" style="text-align:center;color:var(--t);font-size:13px;margin-top:40px">
+  <p>油液健康指数算法 v2.1 &nbsp;|&nbsp; 阈值依据：NB/SH/T 0973-2018《风力发电机组主齿轮箱润滑油换油指标》</p>
+</div>
+
+</body>
+</html>

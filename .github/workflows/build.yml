@@ -1,0 +1,59 @@
+name: 打包油液监测系统
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 安装依赖
+        run: |
+          pip install flask waitress pymodbus pyinstaller
+      
+      - name: 打包 Windows
+        run: |
+          cd ${{ github.workspace }}
+          python build.py
+      
+      - name: 上传 Windows 打包文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: oil_monitor_windows
+          path: dist/
+          retention-days: 30
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 安装依赖
+        run: |
+          pip install flask waitress pymodbus pyinstaller
+      
+      - name: 打包 Linux
+        run: |
+          cd ${{ github.workspace }}
+          python build.py
+      
+      - name: 上传 Linux 打包文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: oil_monitor_linux
+          path: dist/
+          retention-days: 30

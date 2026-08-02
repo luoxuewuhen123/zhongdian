@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>油液监测系统 - 服务器配置方案</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font:20px 'Microsoft YaHei',sans-serif;background:#0f172a;color:#f1f5f9;padding:40px;line-height:2}
+h1{text-align:center;font-size:34px;color:#f8fafc;margin-bottom:8px}
+h2{font-size:28px;color:#60a5fa;margin:40px 0 16px;border-bottom:2px solid #1e3a5f;padding-bottom:10px}
+h3{font-size:22px;color:#93c5fd;margin:28px 0 12px}
+.sub{text-align:center;font-size:16px;color:#cbd5e1;margin-bottom:36px}
+.container{max-width:1100px;margin:0 auto}
+p{margin:12px 0}
+ul,ol{padding-left:30px;margin:12px 0}
+li{margin:8px 0}
+
+table{width:100%;border-collapse:collapse;margin:16px 0 28px;font-size:18px}
+th,td{border:2px solid #475569;padding:14px 18px;text-align:left}
+th{background:#1e293b;color:#60a5fa;font-weight:bold;font-size:19px}
+td{background:#111827}
+td.price{color:#fbbf24;font-weight:bold;font-size:20px}
+td.total{color:#f59e0b;font-size:22px;font-weight:bold}
+
+.note{background:#1e293b;border-left:4px solid #f59e0b;padding:14px 22px;margin:20px 0;border-radius:6px;font-size:17px;color:#cbd5e1}
+.warn{background:#1e293b;border-left:4px solid #ef4444;padding:14px 22px;margin:20px 0;border-radius:6px;font-size:17px;color:#fca5a5}
+
+.highlight{color:#fbbf24;font-weight:bold;font-size:inherit}
+.os-box{background:#1e293b;border:1px solid #475569;border-radius:10px;padding:22px 26px;margin:16px 0}
+.os-box h3{margin-top:0;color:#60a5fa;font-size:22px}
+.os-box .tag{display:inline-block;background:#065f46;color:#34d399;font-size:16px;padding:3px 12px;border-radius:6px;margin-left:10px}
+.os-box .tag.notrec{background:#7c2d12;color:#fca5a5}
+
+.summary{background:linear-gradient(135deg,#1e3a5f,#1e293b);border-radius:12px;padding:26px 30px;margin:24px 0}
+.summary h3{color:#fbbf24;margin-top:0;font-size:24px}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>风电齿轮箱滤油机在线监测系统</h1>
+<div class="sub">服务器配置方案 · 2026年8月 · 支持1000台设备稳定运行</div>
+
+<!-- ==================== 方案推荐 ==================== -->
+<h2>一、推荐方案（性价比最高）</h2>
+
+<div class="summary">
+  <h3>方案：i5-13400 + 32GB + 1TB NVMe SSD + Windows Server 2022</h3>
+  <p>总预算约 <span class="highlight">8,000~10,000 元</span>（含硬件 + 正版系统），1000台设备稳定运行3年以上</p>
+</div>
+
+<h3>硬件配置清单</h3>
+
+<table>
+  <tr><th style="width:20%">配件</th><th style="width:35%">型号</th><th style="width:25%">价格参考</th><th>备注</th></tr>
+  <tr>
+    <td>CPU</td>
+    <td>Intel 酷睿 i5-13400（10核16线程，最高4.6GHz）</td>
+    <td class="price">~1,100 元</td>
+    <td>散片，性能足够</td>
+  </tr>
+  <tr>
+    <td>主板</td>
+    <td>华硕/技嘉 B760M（支持DDR4）</td>
+    <td class="price">~700 元</td>
+    <td>M.2接口，千兆网口</td>
+  </tr>
+  <tr>
+    <td>内存</td>
+    <td>金士顿/威刚 DDR4 3200 32GB（16G×2）</td>
+    <td class="price">~450 元</td>
+    <td>双通道，稳定可靠</td>
+  </tr>
+  <tr>
+    <td>硬盘</td>
+    <td>三星 980 PRO 1TB NVMe PCIe 4.0</td>
+    <td class="price">~550 元</td>
+    <td>读写7000MB/s，数据安全</td>
+  </tr>
+  <tr>
+    <td>电源</td>
+    <td>长城/航嘉 额定500W</td>
+    <td class="price">~250 元</td>
+    <td>80PLUS认证</td>
+  </tr>
+  <tr>
+    <td>CPU散热</td>
+    <td>利民/九州风神 塔式风冷</td>
+    <td class="price">~80 元</td>
+    <td>静音</td>
+  </tr>
+  <tr>
+    <td>机箱</td>
+    <td>先马/酷冷至尊 ATX中塔</td>
+    <td class="price">~200 元</td>
+    <td>散热好</td>
+  </tr>
+  <tr>
+    <td colspan="2" style="text-align:right;color:#60a5fa">硬件合计</td>
+    <td class="total">~3,330 元</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td colspan="2" style="text-align:right;color:#60a5fa">操作系统（推荐）</td>
+    <td class="price">~5,000 元</td>
+    <td>Windows Server 2022 Standard OEM</td>
+  </tr>
+  <tr>
+    <td colspan="2" style="text-align:right;color:#f59e0b;font-size:16px;font-weight:bold">总预算</td>
+    <td class="total">~8,330 元</td>
+    <td></td>
+  </tr>
+</table>
+
+<div class="note">
+  💡 <b>如果预算有限</b>：可以省去操作系统费用，装 Windows 11 专业版（不激活也能正常使用），总预算降至 <span class="highlight">~3,330 元</span>。详见下方"操作系统选择"章节。
+</div>
+
+<!-- ==================== 操作系统 ==================== -->
+<h2>二、操作系统选择</h2>
+
+<div class="os-box">
+  <h3>方案A：Windows Server 2022 Standard <span class="tag">推荐</span></h3>
+  <table>
+    <tr><td style="width:25%">价格</td><td>约 5,000 元（OEM正版授权，绑定一台服务器，终身有效）</td></tr>
+    <tr><td>优点</td><td>专门为7×24小时运行设计，稳定性最高；无自动更新打断；无广告/弹窗；支持更大的文件句柄数；后台服务优化好</td></tr>
+    <tr><td>缺点</td><td>价格较高；操作界面偏专业（和Win10类似，不难用）</td></tr>
+    <tr><td>适用</td><td>正式交付客户、需要长期稳定运行的场景</td></tr>
+  </table>
+</div>
+
+<div class="os-box">
+  <h3>方案B：Windows 11 专业版 <span class="tag">预算友好</span></h3>
+  <table>
+    <tr><td style="width:25%">价格</td><td>约 1,500 元（正版授权）/ 或免费使用（不激活，右下角有水印，功能完全正常）</td></tr>
+    <tr><td>优点</td><td>价格低（甚至免费）；操作界面熟悉；功能完整</td></tr>
+    <tr><td>缺点</td><td>可能自动更新重启（需手动关闭）；有系统广告；非专为服务器优化</td></tr>
+    <tr><td>适用</td><td>内部测试、预算有限、对稳定性要求不那么极致</td></tr>
+  </table>
+</div>
+
+<div class="os-box">
+  <h3>方案C：Windows 10 专业版 <span class="tag notrec">不推荐</span></h3>
+  <table>
+    <tr><td style="width:25%">价格</td><td>约 1,000 元（正版）/ 或免费使用</td></tr>
+    <tr><td>缺点</td><td>2025年10月已停止官方支持，不再接收安全更新；文件句柄默认值较低</td></tr>
+    <tr><td>结论</td><td>不建议用于新部署</td></tr>
+  </table>
+</div>
+
+<div class="os-box">
+  <h3>方案D：Linux (Ubuntu Server) <span class="tag notrec">暂不支持</span></h3>
+  <table>
+    <tr><td>结论</td><td>当前程序用 PyInstaller 打包为 Windows exe，不兼容 Linux。如需 Linux 支持需要重新开发。</td></tr>
+  </table>
+</div>
+
+<!-- ==================== 为什么这么选 ==================== -->
+<h2>三、配置说明（为什么选这些）</h2>
+
+<h3>3.1 CPU：i5-13400（10核16线程）</h3>
+<p>采集是网络IO密集型（等待PLC响应），不是计算密集型。1000台Modbus TCP连接对CPU压力很小，4核就够。选i5-13400是因为：</p>
+<ul>
+  <li>10核16线程，未来扩展有余量（2000台也能跑）</li>
+  <li>65W低功耗，散热简单，电费省</li>
+  <li>自带核显，不需要独立显卡</li>
+  <li>当前市场价~1100元，性价比极高</li>
+</ul>
+
+<h3>3.2 内存：32GB（16G×2）</h3>
+<ul>
+  <li>操作系统预留：~2GB</li>
+  <li>1000台设备Worker对象：~2GB</li>
+  <li>1000个SQLite连接+WAL：~3GB</li>
+  <li>Python运行时+Flask+Waitress：~1GB</li>
+  <li><b>实际占用约8GB，32GB有3倍余量</b></li>
+</ul>
+
+<h3>3.3 硬盘：1TB NVMe SSD</h3>
+<ul>
+  <li>1000台设备每10秒写一条数据 ≈ 260GB/月</li>
+  <li>1TB ≈ 3个月数据，足够</li>
+  <li>NVMe 读写7000MB/s，远超实际需求（~400KB/s）</li>
+  <li>三星980 PRO 1TB当前~550元，质保5年</li>
+</ul>
+
+<div class="note">
+  💡 <b>数据存储建议</b>：如果风机运行数据需要长期保存（超过3个月），可额外加一块 2TB 机械硬盘做定期备份，约 400 元。
+</div>
+
+<!-- ==================== 备用方案 ==================== -->
+<h2>四、备用方案（预算更低）</h2>
+
+<table>
+  <tr><th>方案</th><th>配置</th><th>硬件价格</th><th>适用</th></tr>
+  <tr>
+    <td>入门</td>
+    <td>i3-12100 + 16GB + 512GB SSD</td>
+    <td class="price">~2,100 元</td>
+    <td>200~300台</td>
+  </tr>
+  <tr>
+    <td>标准（推荐）</td>
+    <td>i5-13400 + 32GB + 1TB SSD</td>
+    <td class="price">~3,330 元</td>
+    <td>500~1000台</td>
+  </tr>
+  <tr>
+    <td>充裕</td>
+    <td>i7-13700 + 64GB + 2TB SSD</td>
+    <td class="price">~5,450 元</td>
+    <td>1000~2000台</td>
+  </tr>
+</table>
+
+<!-- ==================== 购买渠道 ==================== -->
+<h2>五、购买建议</h2>
+
+<h3>5.1 自己组装（最省钱）</h3>
+<ul>
+  <li><b>京东自营</b>：CPU、主板、内存、硬盘、电源 → 正品保障，次日达</li>
+  <li><b>淘宝</b>：CPU散片（i5-13400散片~1100元）→ 比盒装便宜200元</li>
+  <li>组装费：自己装免费 / 电脑城装机50~100元</li>
+</ul>
+
+<h3>5.2 品牌整机（省心，有保修）</h3>
+<ul>
+  <li><b>戴尔 PowerEdge T150</b>：Xeon E-2334 / 32GB / 1TB SSD → ~8,000元（含3年上门保修）</li>
+  <li><b>联想 ThinkStation P360</b>：i7-12700 / 32GB / 1TB SSD → ~7,000元</li>
+  <li>整机价格包含正版Windows，不需要单独买系统</li>
+</ul>
+
+<h3>5.3 操作系统购买</h3>
+<ul>
+  <li><b>京东</b>搜索"Windows Server 2022 Standard OEM" → 约5,000元</li>
+  <li><b>微软官方商城</b> → 价格更高但绝对正版</li>
+  <li><b>注意</b>：淘宝上几百块的"正版Key"基本都是盗版，不要买</li>
+</ul>
+
+<div class="warn">
+  ⚠ <b>注意</b>：商用场景必须使用正版操作系统！如果被微软查到使用盗版，可能面临法律风险和罚款。内部测试可以用不激活的 Windows 11。
+</div>
+
+<!-- ==================== 部署步骤 ==================== -->
+<h2>六、部署步骤</h2>
+
+<ol>
+  <li>组装/购买服务器硬件</li>
+  <li>安装操作系统（Windows Server 2022 或 Windows 11 专业版）</li>
+  <li>安装网卡、芯片组驱动</li>
+  <li>设置固定IP地址（如 192.168.0.200），不要用DHCP</li>
+  <li>关闭Windows自动更新（防止半夜重启）</li>
+  <li><b>右键"系统调优.bat" → 以管理员身份运行</b> → 重启电脑</li>
+  <li>将 dist 文件夹复制到 D 盘（不要放 C 盘）</li>
+  <li>双击 start.bat 启动系统</li>
+  <li>浏览器访问 http://服务器IP:5000</li>
+</ol>
+
+<!-- ==================== 网络拓扑 ==================== -->
+<h2>七、网络连接说明</h2>
+
+<p>每台风机上的滤油机监测设备通过网线连接到塔底的光电转换器，将电信号转为光信号后通过单模光纤传输到中控机房。机房侧的光电转换器将光信号转回电信号，通过网线接入核心交换机，最终连接到监测服务器。</p>
+<ul>
+  <li>每台风机独立IP地址（如 192.168.0.150~192.168.0.xxx）</li>
+  <li>通信协议：Modbus TCP，端口3000</li>
+  <li>采集间隔：10秒/次</li>
+  <li>服务器端口：5000（Web管理界面）</li>
+</ul>
+
+<p style="text-align:center;color:#64748b;margin-top:40px">—— 文档版本 v2.1 · 2026年8月 ——</p>
+
+</div>
+</body>
+</html>

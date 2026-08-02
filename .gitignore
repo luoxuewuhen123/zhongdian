@@ -1,0 +1,26 @@
+# 打包输出
+dist/
+build/
+*.spec
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 数据库和运行时文件
+*.db
+*.db-shm
+*.db-wal
+data/
+*.heartbeat
+*.secret
+watchdog.log
+*.flag
+
+# 图标源文件（已转为 ico）
+logo.png
+
+# 临时文件
+*.bat
+!start.bat
