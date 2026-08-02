@@ -1,11 +1,12 @@
 # ============================================================
 # 一键打包: Windows / Linux 双平台支持
 # 运行: python build.py
-# 输出:
-#   Windows: dist/oil_monitor.exe, dist/oil_watchdog.exe, dist/start.bat
-#   Linux:   dist/oil_monitor, dist/oil_watchdog, dist/start.sh
 # ============================================================
 import subprocess, os, sys, shutil
+
+# GitHub Actions Windows 默认 CP1252 不支持中文，强制 UTF-8
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
